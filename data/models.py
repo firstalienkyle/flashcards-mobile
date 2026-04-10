@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 @dataclass
 class Card:
@@ -13,11 +13,13 @@ class Card:
     last_reviewed: Optional[datetime] = None
     created_at: datetime = field(default_factory=datetime.now)
 
+
 @dataclass
 class Deck:
     name: str
     id: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.now)
+
 
 @dataclass
 class ReviewSession:
@@ -26,11 +28,12 @@ class ReviewSession:
     ended_at: Optional[datetime] = None
     cards_reviewed: int = 0
 
+
 @dataclass
 class SessionCard:
     session_id: int
     card_id: int
-    result: str          # 'seen', 'correct', 'incorrect'
+    result: Literal['seen', 'correct', 'incorrect']
     memory_before: float
     memory_after: float
     id: Optional[int] = None

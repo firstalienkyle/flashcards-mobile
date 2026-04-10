@@ -8,6 +8,7 @@ def test_card_defaults():
     assert c.id is None
     assert c.deck_id is None
     assert c.last_reviewed is None
+    assert isinstance(c.created_at, datetime)
 
 def test_card_quiz():
     c = Card(front="Q", back="A", is_quiz=True)
@@ -28,3 +29,5 @@ def test_session_card():
     sc = SessionCard(session_id=1, card_id=2, result="seen",
                      memory_before=50.0, memory_after=60.0)
     assert sc.result == "seen"
+    assert sc.id is None
+    assert isinstance(sc.reviewed_at, datetime)
