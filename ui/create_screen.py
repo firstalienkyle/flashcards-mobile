@@ -1,4 +1,3 @@
-import tkinter as tk
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from config import (ACCENT, BG_CARD, BG_DARK, BG_INPUT, TEXT_PRIMARY, TEXT_MUTED,
@@ -9,8 +8,10 @@ from data.models import Card
 class CreateScreen(ctk.CTkFrame):
     def __init__(self, app, deck_id: int | None = None):
         super().__init__(app, fg_color=BG_DARK, corner_radius=0)
-        self.app     = app
-        self._deck_id = deck_id
+        self.app        = app
+        self._deck_id   = deck_id
+        self._deck_map  = {}
+        self._gen_entries: list[tuple] = []
         self._build()
         self._load_decks()
 
@@ -88,7 +89,7 @@ class CreateScreen(ctk.CTkFrame):
         self._deck_map = {d.name: d.id for d in decks}
         if names:
             self._deck_menu.configure(values=names)
-            if self._deck_id:
+            if self._deck_id is not None:
                 for d in decks:
                     if d.id == self._deck_id:
                         self._deck_var.set(d.name)
