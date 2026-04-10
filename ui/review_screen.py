@@ -15,7 +15,6 @@ class ReviewScreen(ctk.CTkFrame):
         self._session_id: int | None = None
         self._showing_front  = True
         self._animating      = False
-        self._card_orig_w: int | None = None
         self._build()
         self._start_session()
 
@@ -134,12 +133,18 @@ class ReviewScreen(ctk.CTkFrame):
             text=f"{self._index + 1} / {len(self._queue)}"
         )
         self._prev_btn.configure(state="normal" if self._index > 0 else "disabled")
+        self._next_btn.configure(state="normal" if self._index < len(self._queue) - 1 else "disabled")
 
         if card.is_quiz:
-            self._action_btn.configure(text="Submit", state="disabled")
-            self._quiz_entry.delete(0, "end")
-            self._quiz_frame.pack(pady=(0, 12))
-            self._quiz_entry.bind("<Return>", lambda e: self._submit_quiz())
+            if card.id in self._seen:
+                # Already answered — show read-only
+                self._action_btn.configure(text="Next →", state="normal",
+                                           command=lambda: self._go_next())
+            else:
+                self._action_btn.configure(text="Submit", state="disabled")
+                self._quiz_entry.delete(0, "end")
+                self._quiz_frame.pack(pady=(0, 12))
+                self._quiz_entry.bind("<Return>", lambda e: self._submit_quiz())
         else:
             self._action_btn.configure(text="Flip", state="normal",
                                        command=self._flip)
@@ -188,10 +193,19 @@ class ReviewScreen(ctk.CTkFrame):
             self.after(100, lambda: self._fetch_explanation(card, user_ans))
 
     def _fetch_explanation(self, card, _user_ans):
-        try:
-            explanation = self.app.claude.explain_answer(card.front, card.back)
-        except Exception as e:
-            explanation = f"(Could not fetch explanation: {e})"
+        import threading
+        def _run():
+            try:
+                explanation = self.app.claude.explain_answer(card.front, card.back)
+            except Exception as e:
+                explanation = f"(Could not fetch explanation: {e})"
+            if self.winfo_exists():
+                self.after(0, lambda: self._on_explanation_ready(card, explanation))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_explanation_ready(self, card, explanation: str):
+        if not self.winfo_exists():
+            return
         self._explanation.configure(text=explanation, text_color=TEXT_MUTED)
         self._record_and_advance(card, "incorrect", delay_ms=4000)
 
@@ -248,6 +262,8 @@ class ReviewScreen(ctk.CTkFrame):
         self._animating = True
 
         def step_out(i=0):
+            if not self.winfo_exists():
+                return
             if i < len(fade_out):
                 self._card_frame.configure(fg_color=fade_out[i])
                 self.after(25, lambda: step_out(i + 1))
@@ -256,6 +272,9 @@ class ReviewScreen(ctk.CTkFrame):
                 step_in(0)
 
         def step_in(i=0):
+            if not self.winfo_exists():
+                self._animating = False
+                return
             if i < len(fade_in):
                 self._card_frame.configure(fg_color=fade_in[i])
                 self.after(25, lambda: step_in(i + 1))
