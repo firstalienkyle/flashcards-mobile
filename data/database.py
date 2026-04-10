@@ -110,9 +110,15 @@ def create_card(card: Card) -> Card:
             "VALUES (?, ?, ?, ?, ?, ?)",
             (card.deck_id, card.front, card.back, int(card.is_quiz), card.memory_level, now)
         )
-        card.id = cur.lastrowid
-        card.created_at = datetime.fromisoformat(now)
-        return card
+        return Card(
+            id=cur.lastrowid,
+            deck_id=card.deck_id,
+            front=card.front,
+            back=card.back,
+            is_quiz=card.is_quiz,
+            memory_level=card.memory_level,
+            created_at=datetime.fromisoformat(now),
+        )
 
 def get_cards_for_deck(deck_id: int) -> list[Card]:
     with _conn() as conn:
@@ -122,7 +128,7 @@ def get_cards_for_deck(deck_id: int) -> list[Card]:
 
 def get_all_cards() -> list[Card]:
     with _conn() as conn:
-        rows = conn.execute("SELECT * FROM cards").fetchall()
+        rows = conn.execute("SELECT * FROM cards ORDER BY created_at").fetchall()
         return [_row_to_card(r) for r in rows]
 
 def update_card(card: Card) -> None:
