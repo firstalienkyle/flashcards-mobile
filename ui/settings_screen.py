@@ -34,9 +34,10 @@ class SettingsScreen(ctk.CTkFrame):
             ctk.CTkLabel(row, text=label, width=180, anchor="w",
                          font=ctk.CTkFont(FONT_FAMILY, 13),
                          text_color=TEXT_MUTED).pack(side="left")
-            show = kwargs.pop("show", "")
+            show = kwargs.get("show", "")
+            kw   = {k: v for k, v in kwargs.items() if k != "show"}
             entry = ctk.CTkEntry(row, fg_color=BG_INPUT, corner_radius=8,
-                                 show=show, **kwargs)
+                                 show=show, **kw)
             entry.pack(side="left", padx=8)
             self._fields[key] = entry
 
@@ -82,6 +83,10 @@ class SettingsScreen(ctk.CTkFrame):
         self._decay_label.configure(text=f"{decay:.1f}")
 
     def _save(self):
+        goal = self._fields["daily_goal"].get().strip()
+        if goal and not goal.isdigit():
+            messagebox.showerror("Validation", "Daily goal must be a whole number.")
+            return
         for key, entry in self._fields.items():
             db.set_setting(key, entry.get().strip())
         db.set_setting("decay_rate", f"{self._decay_var.get():.1f}")
