@@ -114,10 +114,14 @@ Default `decay_rate` is 5.0 points/day. Adjustable in Settings. The stored `memo
 ### `ClaudeService`
 Uses `claude-sonnet-4-6` via the Anthropic Python SDK.
 
-**`generate_cards(text: str) → list[dict]`**
-- Sends raw text (from camera image or PDF) to Claude with a prompt instructing it to produce concise front/back flashcard pairs
+**`generate_cards_from_text(text: str) → list[dict]`**
+- Sends raw text (from PDF extraction) to Claude with a prompt to produce concise front/back flashcard pairs
 - Returns a list of `{front, back, is_quiz}` dicts for user review before saving
 - `is_quiz` defaults to False; Claude may suggest True for definition-style cards
+
+**`generate_cards_from_image(image_bytes: bytes) → list[dict]`**
+- Sends a raw image (from webcam capture) to Claude Vision API as a base64-encoded message
+- Same return format as `generate_cards_from_text`; Claude reads the image and extracts card pairs directly
 
 **`explain_answer(front: str, back: str) → str`**
 - Called automatically when a quiz card answer doesn't match `card.back`
@@ -127,8 +131,8 @@ Uses `claude-sonnet-4-6` via the Anthropic Python SDK.
 ### `ScanService`
 Two input paths, both funnel into `ClaudeService.generate_cards()`:
 
-- **Camera**: opens webcam via OpenCV (`cv2`), shows live preview in a CTk window, captures on button press, sends the raw image to Claude Vision API (no OCR library needed)
-- **PDF**: extracts text page-by-page with `pdfplumber`, concatenates, passes to `ClaudeService.generate_cards()`
+- **Camera**: opens webcam via OpenCV (`cv2`), shows live preview in a CTk window, captures on button press, passes raw image bytes to `ClaudeService.generate_cards_from_image()` (no OCR library needed)
+- **PDF**: extracts text page-by-page with `pdfplumber`, concatenates, passes to `ClaudeService.generate_cards_from_text()`
 
 Both paths end with a "review generated cards" screen where the user can edit, delete, or approve before saving to the database.
 
