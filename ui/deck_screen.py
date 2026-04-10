@@ -11,6 +11,7 @@ class DeckScreen(ctk.CTkFrame):
         self.app      = app
         self._deck_id = deck_id
         self._build()
+        self._update_title()
         self._load()
 
     def _build(self):
@@ -47,17 +48,16 @@ class DeckScreen(ctk.CTkFrame):
         self._scroll = ctk.CTkScrollableFrame(self, fg_color=BG_DARK, corner_radius=0)
         self._scroll.pack(fill="both", expand=True, padx=PADDING, pady=PADDING)
 
+    def _update_title(self):
+        for d in db.get_all_decks():
+            if d.id == self._deck_id:
+                self._title.configure(text=d.name)
+                break
+
     def _load(self):
         query = self._search_var.get().lower()
         for w in self._scroll.winfo_children():
             w.destroy()
-
-        # Fetch deck name
-        decks = db.get_all_decks()
-        for d in decks:
-            if d.id == self._deck_id:
-                self._title.configure(text=d.name)
-                break
 
         cards = db.get_cards_for_deck(self._deck_id)
         filtered = [c for c in cards if query in c.front.lower() or query in c.back.lower()]
@@ -104,22 +104,20 @@ class DeckScreen(ctk.CTkFrame):
         modal.configure(fg_color=BG_DARK)
         modal.grab_set()
 
-        self._e_front: ctk.CTkTextbox
-        self._e_back: ctk.CTkTextbox
-
-        for attr, label, value in [
-            ("_e_front", "Front", card.front),
-            ("_e_back",  "Back",  card.back),
+        boxes = {}
+        for key, label, value in [
+            ("front", "Front", card.front),
+            ("back",  "Back",  card.back),
         ]:
             r = ctk.CTkFrame(modal, fg_color="transparent")
-            r.pack(fill="x", padx=20, pady=(16 if attr == "_e_front" else 8, 0))
+            r.pack(fill="x", padx=20, pady=(16 if key == "front" else 8, 0))
             ctk.CTkLabel(r, text=label, width=50, anchor="w",
                          font=ctk.CTkFont(FONT_FAMILY, 13), text_color=TEXT_MUTED).pack(side="left")
             tb = ctk.CTkTextbox(r, height=70, width=440, fg_color=BG_INPUT,
                                 corner_radius=8, font=ctk.CTkFont(FONT_FAMILY, 13))
             tb.insert("1.0", value)
             tb.pack(side="left", padx=8)
-            setattr(self, attr, tb)
+            boxes[key] = tb
 
         quiz_var = ctk.BooleanVar(value=card.is_quiz)
         ctk.CTkCheckBox(modal, text="Quiz card", variable=quiz_var,
@@ -128,8 +126,13 @@ class DeckScreen(ctk.CTkFrame):
                         text_color=TEXT_MUTED).pack(anchor="w", padx=72, pady=8)
 
         def save():
-            card.front   = self._e_front.get("1.0", "end").strip()
-            card.back    = self._e_back.get("1.0", "end").strip()
+            front = boxes["front"].get("1.0", "end").strip()
+            back  = boxes["back"].get("1.0", "end").strip()
+            if not front or not back:
+                messagebox.showwarning("Missing content", "Both front and back are required.")
+                return
+            card.front   = front
+            card.back    = back
             card.is_quiz = quiz_var.get()
             db.update_card(card)
             modal.destroy()
@@ -148,4 +151,5 @@ class DeckScreen(ctk.CTkFrame):
         name = dialog.get_input()
         if name and name.strip():
             db.rename_deck(self._deck_id, name.strip())
+            self._update_title()
             self._load()
