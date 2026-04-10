@@ -12,11 +12,14 @@ class ClaudeService:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
             raise ValueError(f"Claude returned invalid JSON: {e}\nRaw: {raw[:200]}")
+        if not isinstance(data, list):
+            raise ValueError(f"Claude returned unexpected JSON type (expected list): {type(data).__name__}\nRaw: {raw[:200]}")
         return data
 
     def generate_cards_from_text(self, text: str) -> list[dict]:
         """Extract flashcard pairs from plain text. Returns list of {front, back, is_quiz}."""
         response = self.client.messages.create(
+            system="You are a flashcard extraction assistant. Always respond with raw JSON only — no markdown formatting, no code fences, no commentary.",
             model=CLAUDE_MODEL,
             max_tokens=2048,
             messages=[{
@@ -34,10 +37,11 @@ class ClaudeService:
         )
         return self._parse_cards(response.content[0].text)
 
-    def generate_cards_from_image(self, image_bytes: bytes) -> list[dict]:
+    def generate_cards_from_image(self, image_bytes: bytes, media_type: str = "image/jpeg") -> list[dict]:
         """Extract flashcard pairs from an image via Claude Vision. Returns list of {front, back, is_quiz}."""
         image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
         response = self.client.messages.create(
+            system="You are a flashcard extraction assistant. Always respond with raw JSON only — no markdown formatting, no code fences, no commentary.",
             model=CLAUDE_MODEL,
             max_tokens=2048,
             messages=[{
@@ -47,7 +51,7 @@ class ClaudeService:
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/jpeg",
+                            "media_type": media_type,
                             "data": image_b64,
                         },
                     },
