@@ -1,7 +1,7 @@
 import random
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Literal
 from data.models import Card
 
 def compute_effective_level(card: Card, decay_rate: float) -> float:
@@ -38,7 +38,7 @@ def answers_match(user_answer: str, correct_answer: str) -> bool:
         return s
     return normalize(user_answer) == normalize(correct_answer)
 
-def apply_memory_delta(card: Card, result: str, already_seen: bool) -> float:
+def apply_memory_delta(card: Card, result: Literal['seen', 'correct', 'incorrect'], already_seen: bool) -> float:
     """
     result: 'seen' (regular flip), 'correct' (quiz), 'incorrect' (quiz)
     already_seen: True if this card was already reviewed earlier in this session.
