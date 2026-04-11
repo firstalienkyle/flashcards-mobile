@@ -1,80 +1,87 @@
-import customtkinter as ctk
-from config import (ACCENT, BG_CARD, BG_DARK, TEXT_PRIMARY, TEXT_MUTED,
-                    CORNER_R, PADDING, FONT_FAMILY, COLOR_GREEN)
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QPushButton, QProgressBar, QScrollArea, QFrame,
+)
+from PyQt5.QtCore import Qt
+import data.database as db
 
-class HomeScreen(ctk.CTkFrame):
+
+class HomeScreen(QWidget):
     def __init__(self, app):
-        super().__init__(app, fg_color=BG_DARK, corner_radius=0)
+        super().__init__()
         self.app = app
         self._build()
         self._load()
 
     def _build(self):
-        # ── Top bar ──────────────────────────────────────────────────────────
-        top = ctk.CTkFrame(self, fg_color=BG_DARK, corner_radius=0)
-        top.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        ctk.CTkLabel(top, text="Flashcards", font=ctk.CTkFont(FONT_FAMILY, 24, "bold"),
-                     text_color=TEXT_PRIMARY).pack(side="left")
+        # Top bar
+        top = QHBoxLayout()
+        title = QLabel("Flashcards")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        top.addWidget(title)
+        top.addStretch()
+        settings_btn = QPushButton("⚙ Settings")
+        settings_btn.clicked.connect(self.app.show_settings)
+        top.addWidget(settings_btn)
+        root.addLayout(top)
 
-        ctk.CTkButton(top, text="⚙ Settings", width=100, fg_color=BG_CARD,
-                      hover_color=ACCENT, corner_radius=CORNER_R,
-                      command=self.app.show_settings).pack(side="right")
+        # Daily goal bar
+        goal_frame = QFrame()
+        goal_frame.setFrameShape(QFrame.StyledPanel)
+        goal_layout = QHBoxLayout(goal_frame)
+        self._goal_label = QLabel("Loading...")
+        goal_layout.addWidget(self._goal_label)
+        goal_layout.addStretch()
+        self._progress = QProgressBar()
+        self._progress.setFixedWidth(220)
+        self._progress.setTextVisible(False)
+        goal_layout.addWidget(self._progress)
+        root.addWidget(goal_frame)
 
-        # ── Daily goal bar ────────────────────────────────────────────────────
-        goal_frame = ctk.CTkFrame(self, fg_color=BG_CARD, corner_radius=CORNER_R)
-        goal_frame.pack(fill="x", padx=PADDING, pady=(12, 0))
-
-        inner = ctk.CTkFrame(goal_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=PADDING, pady=10)
-
-        self._goal_label = ctk.CTkLabel(inner, text="Loading...",
-                                        font=ctk.CTkFont(FONT_FAMILY, 13),
-                                        text_color=TEXT_MUTED)
-        self._goal_label.pack(side="left")
-
-        self._progress = ctk.CTkProgressBar(inner, width=220, height=10,
-                                            progress_color=ACCENT, corner_radius=5)
-        self._progress.set(0)
-        self._progress.pack(side="right")
-
-        # ── Action buttons ────────────────────────────────────────────────────
-        btn_row = ctk.CTkFrame(self, fg_color=BG_DARK)
-        btn_row.pack(fill="x", padx=PADDING, pady=(12, 0))
-
-        for text, cmd in [
+        # Action buttons
+        btn_row = QHBoxLayout()
+        for text, slot in [
             ("▶  Start Review", self.app.show_review),
             ("+  New Card",     self.app.show_create),
-            ("↑  Import",       self._open_import),
         ]:
-            ctk.CTkButton(btn_row, text=text, height=40, fg_color=ACCENT,
-                          hover_color="#5a61e8", corner_radius=CORNER_R,
-                          font=ctk.CTkFont(FONT_FAMILY, 13, "bold"),
-                          command=cmd).pack(side="left", padx=(0, 8))
+            btn = QPushButton(text)
+            btn.clicked.connect(slot)
+            btn_row.addWidget(btn)
+        btn_row.addStretch()
+        root.addLayout(btn_row)
 
-        # ── Deck grid (scrollable) ────────────────────────────────────────────
-        self._scroll = ctk.CTkScrollableFrame(self, fg_color=BG_DARK, corner_radius=0)
-        self._scroll.pack(fill="both", expand=True, padx=PADDING, pady=PADDING)
-        self._scroll.columnconfigure((0, 1, 2), weight=1)
+        # Deck grid (scrollable)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        self._grid_container = QWidget()
+        self._grid = QGridLayout(self._grid_container)
+        self._grid.setSpacing(8)
+        self._grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        scroll.setWidget(self._grid_container)
+        root.addWidget(scroll)
 
     def _load(self):
-        # Goal progress
-        goal   = int(self.app.db.get_setting("daily_goal"))
-        count  = self.app.db.get_today_reviewed_count()
-        ratio  = min(1.0, count / max(goal, 1))
-        self._goal_label.configure(text=f"{count} / {goal} cards reviewed today")
-        self._progress.set(ratio)
+        goal  = int(self.app.db.get_setting("daily_goal") or 10)
+        count = self.app.db.get_today_reviewed_count()
+        self._goal_label.setText(f"{count} / {goal} cards reviewed today")
+        self._progress.setMaximum(goal)
+        self._progress.setValue(min(count, goal))
 
-        # Deck tiles
-        for widget in self._scroll.winfo_children():
-            widget.destroy()
+        while self._grid.count():
+            item = self._grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
         decks = self.app.db.get_all_decks()
         if not decks:
-            ctk.CTkLabel(self._scroll, text="No decks yet — create your first card!",
-                         text_color=TEXT_MUTED,
-                         font=ctk.CTkFont(FONT_FAMILY, 14)).grid(row=0, column=0,
-                                                                   columnspan=3, pady=40)
+            lbl = QLabel("No decks yet — create your first card!")
+            lbl.setAlignment(Qt.AlignCenter)
+            self._grid.addWidget(lbl, 0, 0, 1, 3)
             return
 
         for i, deck in enumerate(decks):
@@ -82,25 +89,17 @@ class HomeScreen(ctk.CTkFrame):
             self._deck_tile(deck, stats, row=i // 3, col=i % 3)
 
     def _deck_tile(self, deck, stats, row, col):
-        tile = ctk.CTkFrame(self._scroll, fg_color=BG_CARD, corner_radius=CORNER_R,
-                            cursor="hand2")
-        tile.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+        tile = QFrame()
+        tile.setFrameShape(QFrame.StyledPanel)
+        tile.setCursor(Qt.PointingHandCursor)
+        layout = QVBoxLayout(tile)
+        layout.setContentsMargins(12, 12, 12, 12)
 
-        ctk.CTkLabel(tile, text=deck.name, font=ctk.CTkFont(FONT_FAMILY, 15, "bold"),
-                     text_color=TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(12, 4))
+        name_lbl = QLabel(deck.name)
+        name_lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
+        layout.addWidget(name_lbl)
+        layout.addWidget(QLabel(f"{stats['card_count']} cards"))
+        layout.addWidget(QLabel(f"Memory: {stats['avg_memory']:.0f}%"))
 
-        ctk.CTkLabel(tile, text=f"{stats['card_count']} cards",
-                     font=ctk.CTkFont(FONT_FAMILY, 12), text_color=TEXT_MUTED).pack(anchor="w", padx=12)
-
-        mem_color = COLOR_GREEN if stats["avg_memory"] >= 60 else ACCENT
-        ctk.CTkLabel(tile, text=f"Memory: {stats['avg_memory']:.0f}%",
-                     font=ctk.CTkFont(FONT_FAMILY, 12),
-                     text_color=mem_color).pack(anchor="w", padx=12, pady=(0, 12))
-
-        tile.bind("<Button-1>", lambda e, did=deck.id: self.app.show_deck(did))
-        for child in tile.winfo_children():
-            child.bind("<Button-1>", lambda e, did=deck.id: self.app.show_deck(did))
-
-    def _open_import(self):
-        from ui.create_screen import CreateScreen
-        self.app.show_create()
+        tile.mousePressEvent = lambda _e, did=deck.id: self.app.show_deck(did)
+        self._grid.addWidget(tile, row, col)
