@@ -1,94 +1,104 @@
-from tkinter import messagebox
-import customtkinter as ctk
-from config import (ACCENT, BG_CARD, BG_DARK, BG_INPUT, TEXT_PRIMARY, TEXT_MUTED,
-                    CORNER_R, PADDING, FONT_FAMILY)
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QLabel, QPushButton, QLineEdit, QSlider, QMessageBox, QFrame,
+)
+from PyQt5.QtCore import Qt
 import data.database as db
 
-class SettingsScreen(ctk.CTkFrame):
+
+class SettingsScreen(QWidget):
     def __init__(self, app):
-        super().__init__(app, fg_color=BG_DARK, corner_radius=0)
+        super().__init__()
         self.app = app
         self._build()
         self._load()
 
     def _build(self):
-        top = ctk.CTkFrame(self, fg_color=BG_DARK)
-        top.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
-        ctk.CTkButton(top, text="← Back", width=80, fg_color=BG_CARD,
-                      hover_color=ACCENT, corner_radius=CORNER_R,
-                      command=self.app.show_home).pack(side="left")
-        ctk.CTkLabel(top, text="Settings", font=ctk.CTkFont(FONT_FAMILY, 20, "bold"),
-                     text_color=TEXT_PRIMARY).pack(side="left", padx=12)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        form = ctk.CTkFrame(self, fg_color=BG_CARD, corner_radius=CORNER_R)
-        form.pack(fill="x", padx=PADDING, pady=PADDING)
+        # Top bar
+        top = QHBoxLayout()
+        back_btn = QPushButton("← Back")
+        back_btn.clicked.connect(self.app.show_home)
+        top.addWidget(back_btn)
+        title = QLabel("Settings")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        top.addWidget(title)
+        top.addStretch()
+        root.addLayout(top)
 
-        self._fields = {}
-        for key, label, kwargs in [
-            ("daily_goal",    "Daily goal (cards)",     {"width": 100}),
-            ("notify_time",   "Notify at (HH:MM)",      {"width": 100}),
-            ("claude_api_key","Claude API key",          {"width": 400, "show": "*"}),
-        ]:
-            row = ctk.CTkFrame(form, fg_color="transparent")
-            row.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
-            ctk.CTkLabel(row, text=label, width=180, anchor="w",
-                         font=ctk.CTkFont(FONT_FAMILY, 13),
-                         text_color=TEXT_MUTED).pack(side="left")
-            show = kwargs.get("show", "")
-            kw   = {k: v for k, v in kwargs.items() if k != "show"}
-            entry = ctk.CTkEntry(row, fg_color=BG_INPUT, corner_radius=8,
-                                 show=show, **kw)
-            entry.pack(side="left", padx=8)
-            self._fields[key] = entry
+        # Form
+        form_frame = QFrame()
+        form_frame.setFrameShape(QFrame.StyledPanel)
+        form = QFormLayout(form_frame)
+        form.setContentsMargins(16, 16, 16, 16)
+        form.setSpacing(12)
 
-            # Show/hide toggle for API key
-            if key == "claude_api_key":
-                vis_var = ctk.BooleanVar(value=False)
-                def toggle_vis(var=vis_var, e=entry):
-                    e.configure(show="" if var.get() else "*")
-                ctk.CTkCheckBox(row, text="Show", variable=vis_var,
-                                command=toggle_vis, fg_color=ACCENT,
-                                checkmark_color="white",
-                                font=ctk.CTkFont(FONT_FAMILY, 12),
-                                text_color=TEXT_MUTED).pack(side="left", padx=8)
+        self._goal_edit = QLineEdit()
+        self._goal_edit.setFixedWidth(100)
+        form.addRow("Daily goal (cards):", self._goal_edit)
 
-        # Decay rate slider
-        decay_row = ctk.CTkFrame(form, fg_color="transparent")
-        decay_row.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
-        ctk.CTkLabel(decay_row, text="Decay rate (pts/day)", width=180, anchor="w",
-                     font=ctk.CTkFont(FONT_FAMILY, 13),
-                     text_color=TEXT_MUTED).pack(side="left")
-        self._decay_var = ctk.DoubleVar(value=5.0)
-        self._decay_label = ctk.CTkLabel(decay_row, text="5.0",
-                                          font=ctk.CTkFont(FONT_FAMILY, 13),
-                                          text_color=TEXT_PRIMARY, width=30)
-        self._decay_label.pack(side="right", padx=(0, PADDING))
-        ctk.CTkSlider(decay_row, from_=0, to=20, variable=self._decay_var,
-                      width=200, progress_color=ACCENT,
-                      command=lambda v: self._decay_label.configure(
-                          text=f"{v:.1f}")).pack(side="left", padx=8)
+        self._notify_edit = QLineEdit()
+        self._notify_edit.setFixedWidth(100)
+        form.addRow("Notify at (HH:MM):", self._notify_edit)
 
-        # Save button
-        ctk.CTkButton(form, text="Save Settings", fg_color=ACCENT,
-                      hover_color="#5a61e8", corner_radius=CORNER_R,
-                      command=self._save).pack(anchor="e", padx=PADDING, pady=PADDING)
+        api_row = QHBoxLayout()
+        self._api_edit = QLineEdit()
+        self._api_edit.setFixedWidth(400)
+        self._api_edit.setEchoMode(QLineEdit.Password)
+        api_row.addWidget(self._api_edit)
+        show_btn = QPushButton("Show")
+        show_btn.setCheckable(True)
+        show_btn.toggled.connect(
+            lambda checked: self._api_edit.setEchoMode(
+                QLineEdit.Normal if checked else QLineEdit.Password
+            )
+        )
+        api_row.addWidget(show_btn)
+        api_row.addStretch()
+        form.addRow("Claude API key:", api_row)
+
+        decay_row = QHBoxLayout()
+        self._decay_slider = QSlider(Qt.Horizontal)
+        self._decay_slider.setRange(0, 200)
+        self._decay_slider.setFixedWidth(200)
+        self._decay_label = QLabel("5.0")
+        self._decay_slider.valueChanged.connect(
+            lambda v: self._decay_label.setText(f"{v / 10:.1f}")
+        )
+        decay_row.addWidget(self._decay_slider)
+        decay_row.addWidget(self._decay_label)
+        decay_row.addStretch()
+        form.addRow("Decay rate (pts/day):", decay_row)
+
+        root.addWidget(form_frame)
+
+        save_btn = QPushButton("Save Settings")
+        save_btn.clicked.connect(self._save)
+        root.addWidget(save_btn, alignment=Qt.AlignRight)
+        root.addStretch()
 
     def _load(self):
         settings = db.get_all_settings()
-        for key, entry in self._fields.items():
-            entry.delete(0, "end")
-            entry.insert(0, settings.get(key, ""))
+        self._goal_edit.setText(settings.get("daily_goal", "10"))
+        self._notify_edit.setText(settings.get("notify_time", "09:00"))
+        self._api_edit.setText(settings.get("claude_api_key", ""))
         decay = float(settings.get("decay_rate", "5.0"))
-        self._decay_var.set(decay)
-        self._decay_label.configure(text=f"{decay:.1f}")
+        self._decay_slider.setValue(int(decay * 10))
+        self._decay_label.setText(f"{decay:.1f}")
 
     def _save(self):
-        goal = self._fields["daily_goal"].get().strip()
+        goal = self._goal_edit.text().strip()
         if goal and not goal.isdigit():
-            messagebox.showerror("Validation", "Daily goal must be a whole number.")
+            QMessageBox.warning(self, "Validation",
+                                "Daily goal must be a whole number.")
             return
-        for key, entry in self._fields.items():
-            db.set_setting(key, entry.get().strip())
-        db.set_setting("decay_rate", f"{self._decay_var.get():.1f}")
-        messagebox.showinfo("Saved", "Settings saved.")
+        db.set_setting("daily_goal", goal)
+        db.set_setting("notify_time", self._notify_edit.text().strip())
+        db.set_setting("claude_api_key", self._api_edit.text().strip())
+        db.set_setting("decay_rate",
+                       f"{self._decay_slider.value() / 10:.1f}")
+        QMessageBox.information(self, "Saved", "Settings saved.")
         self.app.show_home()
