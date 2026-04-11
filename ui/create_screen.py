@@ -1,153 +1,169 @@
-from tkinter import filedialog, messagebox
-import customtkinter as ctk
-from config import (ACCENT, BG_CARD, BG_DARK, BG_INPUT, TEXT_PRIMARY, TEXT_MUTED,
-                    CORNER_R, PADDING, FONT_FAMILY, COLOR_RED)
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QTextEdit, QComboBox,
+    QCheckBox, QScrollArea, QFrame, QLineEdit,
+    QMessageBox, QFileDialog, QInputDialog,
+)
+from PyQt5.QtCore import Qt
 import data.database as db
 from data.models import Card
 
-class CreateScreen(ctk.CTkFrame):
-    def __init__(self, app, deck_id: int | None = None):
-        super().__init__(app, fg_color=BG_DARK, corner_radius=0)
-        self.app        = app
-        self._deck_id   = deck_id
-        self._deck_map  = {}
-        self._gen_entries: list[tuple] = []
+
+class CreateScreen(QWidget):
+    def __init__(self, app, deck_id=None):
+        super().__init__()
+        self.app       = app
+        self._deck_id  = deck_id
+        self._deck_map = {}
+        self._gen_rows: list = []
         self._build()
         self._load_decks()
 
     def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
         # Header
-        top = ctk.CTkFrame(self, fg_color=BG_DARK)
-        top.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
-        ctk.CTkButton(top, text="← Back", width=80, fg_color=BG_CARD,
-                      hover_color=ACCENT, corner_radius=CORNER_R,
-                      command=self.app.show_home).pack(side="left")
-        ctk.CTkLabel(top, text="New Card", font=ctk.CTkFont(FONT_FAMILY, 20, "bold"),
-                     text_color=TEXT_PRIMARY).pack(side="left", padx=12)
+        top = QHBoxLayout()
+        back_btn = QPushButton("← Back")
+        back_btn.clicked.connect(self.app.show_home)
+        top.addWidget(back_btn)
+        title = QLabel("New Card")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        top.addWidget(title)
+        top.addStretch()
+        root.addLayout(top)
 
-        form = ctk.CTkFrame(self, fg_color=BG_CARD, corner_radius=CORNER_R)
-        form.pack(fill="x", padx=PADDING, pady=PADDING)
+        # Form
+        form_frame = QFrame()
+        form_frame.setFrameShape(QFrame.StyledPanel)
+        form_layout = QVBoxLayout(form_frame)
+        form_layout.setContentsMargins(16, 16, 16, 16)
+        form_layout.setSpacing(10)
 
-        # Deck selector
-        row = ctk.CTkFrame(form, fg_color="transparent")
-        row.pack(fill="x", padx=PADDING, pady=(PADDING, 0))
-        ctk.CTkLabel(row, text="Deck", font=ctk.CTkFont(FONT_FAMILY, 13),
-                     text_color=TEXT_MUTED, width=60, anchor="w").pack(side="left")
-        self._deck_var = ctk.StringVar(value="")
-        self._deck_menu = ctk.CTkOptionMenu(row, variable=self._deck_var, width=260,
-                                            fg_color=BG_INPUT, button_color=ACCENT)
-        self._deck_menu.pack(side="left", padx=(8, 0))
-        ctk.CTkButton(row, text="+ New Deck", width=90, fg_color="transparent",
-                      text_color=ACCENT, hover_color=BG_INPUT,
-                      command=self._new_deck_dialog).pack(side="left", padx=8)
+        deck_row = QHBoxLayout()
+        deck_row.addWidget(QLabel("Deck"))
+        self._deck_combo = QComboBox()
+        self._deck_combo.setFixedWidth(260)
+        deck_row.addWidget(self._deck_combo)
+        new_deck_btn = QPushButton("+ New Deck")
+        new_deck_btn.clicked.connect(self._new_deck_dialog)
+        deck_row.addWidget(new_deck_btn)
+        deck_row.addStretch()
+        form_layout.addLayout(deck_row)
 
-        # Front / Back
         for attr, label in [("_front_box", "Front"), ("_back_box", "Back")]:
-            r = ctk.CTkFrame(form, fg_color="transparent")
-            r.pack(fill="x", padx=PADDING, pady=(10, 0))
-            ctk.CTkLabel(r, text=label, font=ctk.CTkFont(FONT_FAMILY, 13),
-                         text_color=TEXT_MUTED, width=60, anchor="w").pack(side="left")
-            tb = ctk.CTkTextbox(r, height=70, width=500, fg_color=BG_INPUT,
-                                corner_radius=8, font=ctk.CTkFont(FONT_FAMILY, 13))
-            tb.pack(side="left", padx=8)
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label))
+            tb = QTextEdit()
+            tb.setFixedHeight(70)
+            row.addWidget(tb)
+            form_layout.addLayout(row)
             setattr(self, attr, tb)
 
-        # is_quiz toggle
-        quiz_row = ctk.CTkFrame(form, fg_color="transparent")
-        quiz_row.pack(fill="x", padx=PADDING, pady=(10, 0))
-        ctk.CTkLabel(quiz_row, text="", width=60).pack(side="left")
-        self._quiz_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(quiz_row, text="Quiz card (user must type the answer)",
-                        variable=self._quiz_var,
-                        font=ctk.CTkFont(FONT_FAMILY, 13), text_color=TEXT_MUTED,
-                        checkmark_color="white", fg_color=ACCENT).pack(side="left")
+        self._quiz_cb = QCheckBox("Quiz card (user must type the answer)")
+        form_layout.addWidget(self._quiz_cb)
 
-        # Save button row
-        btn_row = ctk.CTkFrame(form, fg_color="transparent")
-        btn_row.pack(fill="x", padx=PADDING, pady=PADDING)
-        ctk.CTkButton(btn_row, text="Save Card", width=140, fg_color=ACCENT,
-                      hover_color="#5a61e8", corner_radius=CORNER_R,
-                      command=self._save_card).pack(side="left")
-        ctk.CTkButton(btn_row, text="📷 Scan", width=100, fg_color=BG_INPUT,
-                      hover_color=ACCENT, corner_radius=CORNER_R,
-                      command=self._scan_camera).pack(side="left", padx=8)
-        ctk.CTkButton(btn_row, text="📄 Import PDF", width=120, fg_color=BG_INPUT,
-                      hover_color=ACCENT, corner_radius=CORNER_R,
-                      command=self._import_pdf).pack(side="left")
+        btn_row = QHBoxLayout()
+        save_btn = QPushButton("Save Card")
+        save_btn.clicked.connect(self._save_card)
+        btn_row.addWidget(save_btn)
+        scan_btn = QPushButton("📷 Scan")
+        scan_btn.clicked.connect(self._scan_camera)
+        btn_row.addWidget(scan_btn)
+        pdf_btn = QPushButton("📄 Import PDF")
+        pdf_btn.clicked.connect(self._import_pdf)
+        btn_row.addWidget(pdf_btn)
+        btn_row.addStretch()
+        form_layout.addLayout(btn_row)
 
-        # Generated cards review area (hidden until import)
-        self._gen_scroll = ctk.CTkScrollableFrame(
-            self, fg_color=BG_DARK,
-            label_text="Generated cards — review before saving",
-            label_font=ctk.CTkFont(FONT_FAMILY, 13),
-            label_text_color=TEXT_MUTED
-        )
+        root.addWidget(form_frame)
+
+        # Generated cards area (hidden until import)
+        self._gen_label = QLabel("Generated cards — review before saving")
+        self._gen_label.setStyleSheet("font-weight: bold;")
+        self._gen_label.hide()
+        root.addWidget(self._gen_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        self._gen_container = QWidget()
+        self._gen_layout = QVBoxLayout(self._gen_container)
+        self._gen_layout.setAlignment(Qt.AlignTop)
+        scroll.setWidget(self._gen_container)
+        self._gen_scroll = scroll
+        self._gen_scroll.hide()
+        root.addWidget(self._gen_scroll)
 
     def _load_decks(self):
         decks = db.get_all_decks()
-        names = [d.name for d in decks]
         self._deck_map = {d.name: d.id for d in decks}
-        if names:
-            self._deck_menu.configure(values=names)
+        self._deck_combo.clear()
+        if decks:
+            for d in decks:
+                self._deck_combo.addItem(d.name)
             if self._deck_id is not None:
-                for d in decks:
+                for i, d in enumerate(decks):
                     if d.id == self._deck_id:
-                        self._deck_var.set(d.name)
+                        self._deck_combo.setCurrentIndex(i)
                         break
-            else:
-                self._deck_var.set(names[0])
         else:
-            self._deck_menu.configure(values=["(no decks — create one)"])
+            self._deck_combo.addItem("(no decks — create one)")
 
-    def _get_selected_deck_id(self) -> int | None:
-        return self._deck_map.get(self._deck_var.get())
+    def _get_selected_deck_id(self):
+        return self._deck_map.get(self._deck_combo.currentText())
 
     def _new_deck_dialog(self):
-        dialog = ctk.CTkInputDialog(text="Deck name:", title="New Deck")
-        name = dialog.get_input()
-        if name and name.strip():
+        name, ok = QInputDialog.getText(self, "New Deck", "Deck name:")
+        if ok and name.strip():
             d = db.create_deck(name.strip())
             self._deck_map[d.name] = d.id
-            names = list(self._deck_map.keys())
-            self._deck_menu.configure(values=names)
-            self._deck_var.set(d.name)
+            self._deck_combo.addItem(d.name)
+            self._deck_combo.setCurrentText(d.name)
 
     def _save_card(self):
-        front = self._front_box.get("1.0", "end").strip()
-        back  = self._back_box.get("1.0", "end").strip()
+        front   = self._front_box.toPlainText().strip()
+        back    = self._back_box.toPlainText().strip()
         deck_id = self._get_selected_deck_id()
-
         if not front or not back:
-            messagebox.showwarning("Missing content", "Both front and back are required.")
+            QMessageBox.warning(self, "Missing content",
+                                "Both front and back are required.")
             return
         if deck_id is None:
-            messagebox.showwarning("No deck", "Please select or create a deck first.")
+            QMessageBox.warning(self, "No deck",
+                                "Please select or create a deck first.")
             return
-
-        card = Card(front=front, back=back, is_quiz=self._quiz_var.get(), deck_id=deck_id)
-        db.create_card(card)
-        self._front_box.delete("1.0", "end")
-        self._back_box.delete("1.0", "end")
-        messagebox.showinfo("Saved", "Card saved successfully!")
+        db.create_card(Card(front=front, back=back,
+                            is_quiz=self._quiz_cb.isChecked(),
+                            deck_id=deck_id))
+        self._front_box.clear()
+        self._back_box.clear()
+        QMessageBox.information(self, "Saved", "Card saved successfully!")
 
     def _scan_camera(self):
         deck_id = self._get_selected_deck_id()
         if deck_id is None:
-            messagebox.showwarning("No deck", "Please select or create a deck first.")
+            QMessageBox.warning(self, "No deck",
+                                "Please select or create a deck first.")
             return
         try:
             image_bytes = self.app.scan.capture_from_camera()
             cards_data  = self.app.claude.generate_cards_from_image(image_bytes)
             self._show_generated_cards(cards_data, deck_id)
         except Exception as e:
-            messagebox.showerror("Scan failed", str(e))
+            QMessageBox.critical(self, "Scan failed", str(e))
 
     def _import_pdf(self):
         deck_id = self._get_selected_deck_id()
         if deck_id is None:
-            messagebox.showwarning("No deck", "Please select or create a deck first.")
+            QMessageBox.warning(self, "No deck",
+                                "Please select or create a deck first.")
             return
-        path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open PDF", "", "PDF files (*.pdf)"
+        )
         if not path:
             return
         try:
@@ -155,54 +171,56 @@ class CreateScreen(ctk.CTkFrame):
             cards_data = self.app.claude.generate_cards_from_text(text)
             self._show_generated_cards(cards_data, deck_id)
         except Exception as e:
-            messagebox.showerror("Import failed", str(e))
+            QMessageBox.critical(self, "Import failed", str(e))
 
-    def _show_generated_cards(self, cards_data: list[dict], deck_id: int):
-        for w in self._gen_scroll.winfo_children():
-            w.destroy()
-        self._gen_scroll.pack(fill="both", expand=True, padx=PADDING, pady=(0, PADDING))
+    def _show_generated_cards(self, cards_data: list, deck_id: int):
+        while self._gen_layout.count():
+            item = self._gen_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._gen_rows = []
 
-        self._gen_entries: list[tuple] = []
         for cd in cards_data:
-            row_frame = ctk.CTkFrame(self._gen_scroll, fg_color=BG_CARD, corner_radius=CORNER_R)
-            row_frame.pack(fill="x", pady=4)
+            row_frame = QFrame()
+            row_frame.setFrameShape(QFrame.StyledPanel)
+            row_layout = QHBoxLayout(row_frame)
+            front_e = QLineEdit(cd.get("front", ""))
+            front_e.setFixedWidth(380)
+            row_layout.addWidget(front_e)
+            back_e = QLineEdit(cd.get("back", ""))
+            back_e.setFixedWidth(380)
+            row_layout.addWidget(back_e)
+            quiz_cb = QCheckBox("Quiz")
+            quiz_cb.setChecked(cd.get("is_quiz", False))
+            row_layout.addWidget(quiz_cb)
+            del_btn = QPushButton("✕")
+            del_btn.setFixedSize(30, 30)
+            del_btn.clicked.connect(
+                lambda _checked, rf=row_frame: rf.deleteLater()
+            )
+            row_layout.addWidget(del_btn)
+            self._gen_layout.addWidget(row_frame)
+            self._gen_rows.append((front_e, back_e, quiz_cb, row_frame))
 
-            front_e = ctk.CTkEntry(row_frame, width=380, fg_color=BG_INPUT, corner_radius=6)
-            front_e.insert(0, cd.get("front", ""))
-            front_e.pack(side="left", padx=8, pady=8)
-
-            back_e = ctk.CTkEntry(row_frame, width=380, fg_color=BG_INPUT, corner_radius=6)
-            back_e.insert(0, cd.get("back", ""))
-            back_e.pack(side="left", padx=8)
-
-            quiz_var = ctk.BooleanVar(value=cd.get("is_quiz", False))
-            ctk.CTkCheckBox(row_frame, text="Quiz", variable=quiz_var,
-                            fg_color=ACCENT, checkmark_color="white").pack(side="left", padx=8)
-
-            del_btn = ctk.CTkButton(row_frame, text="✕", width=30, fg_color=COLOR_RED,
-                                    hover_color="#c0392b", corner_radius=6)
-            del_btn.pack(side="right", padx=8)
-
-            entry_tuple = (front_e, back_e, quiz_var, row_frame)
-            self._gen_entries.append(entry_tuple)
-            del_btn.configure(command=lambda rf=row_frame: rf.destroy())
-
-        ctk.CTkButton(
-            self._gen_scroll, text="Save All Cards", fg_color=ACCENT,
-            hover_color="#5a61e8", corner_radius=CORNER_R,
-            command=lambda: self._save_generated(deck_id)
-        ).pack(pady=8)
+        save_all_btn = QPushButton("Save All Cards")
+        save_all_btn.clicked.connect(lambda: self._save_generated(deck_id))
+        self._gen_layout.addWidget(save_all_btn)
+        self._gen_label.show()
+        self._gen_scroll.show()
 
     def _save_generated(self, deck_id: int):
         saved = 0
-        for front_e, back_e, quiz_var, row_frame in self._gen_entries:
-            if not row_frame.winfo_exists():
+        for front_e, back_e, quiz_cb, row_frame in self._gen_rows:
+            if not row_frame.isVisible():
                 continue
-            front = front_e.get().strip()
-            back  = back_e.get().strip()
+            front = front_e.text().strip()
+            back  = back_e.text().strip()
             if front and back:
                 db.create_card(Card(front=front, back=back,
-                                    is_quiz=quiz_var.get(), deck_id=deck_id))
+                                    is_quiz=quiz_cb.isChecked(),
+                                    deck_id=deck_id))
                 saved += 1
-        messagebox.showinfo("Saved", f"{saved} cards saved to deck.")
-        self._gen_scroll.pack_forget()
+        QMessageBox.information(self, "Saved",
+                                f"{saved} cards saved to deck.")
+        self._gen_label.hide()
+        self._gen_scroll.hide()
