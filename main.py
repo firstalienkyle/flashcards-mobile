@@ -31,9 +31,7 @@ def main():
     )
     app.show()
 
-    # QApplication event loop (Qt's run-loop, not a shell command)
-    run_loop = getattr(qt_app, "exec_")
-    sys.exit(run_loop())
+    sys.exit(qt_app.exec_())
 
 
 if __name__ == "__main__":

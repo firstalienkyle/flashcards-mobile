@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox, QInputDialog,
 )
 from PyQt5.QtCore import Qt
-import data.database as db
 from data.models import Card
 
 
@@ -58,7 +57,7 @@ class DeckScreen(QWidget):
         root.addWidget(scroll)
 
     def _update_title(self):
-        for d in db.get_all_decks():
+        for d in self.app.db.get_all_decks():
             if d.id == self._deck_id:
                 self._title.setText(d.name)
                 break
@@ -70,7 +69,7 @@ class DeckScreen(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        cards    = db.get_cards_for_deck(self._deck_id)
+        cards    = self.app.db.get_cards_for_deck(self._deck_id)
         filtered = [c for c in cards
                     if query in c.front.lower() or query in c.back.lower()]
 
@@ -150,7 +149,7 @@ class DeckScreen(QWidget):
             card.front   = front
             card.back    = back
             card.is_quiz = quiz_cb.isChecked()
-            db.update_card(card)
+            self.app.db.update_card(card)
             dlg.accept()
             self._load()
 
@@ -165,7 +164,7 @@ class DeckScreen(QWidget):
             QMessageBox.Yes | QMessageBox.No
         )
         if reply == QMessageBox.Yes:
-            db.delete_card(card.id)
+            self.app.db.delete_card(card.id)
             self._load()
 
     def _rename_deck(self):
@@ -173,5 +172,5 @@ class DeckScreen(QWidget):
             self, "Rename Deck", "New deck name:"
         )
         if ok and name.strip():
-            db.rename_deck(self._deck_id, name.strip())
+            self.app.db.rename_deck(self._deck_id, name.strip())
             self._update_title()

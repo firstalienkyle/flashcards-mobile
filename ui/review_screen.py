@@ -281,6 +281,9 @@ class ReviewScreen(QWidget):
             self._show_card()
 
     def _end_session(self):
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait()
         if self._session_id:
             db.end_session(self._session_id, len(self._seen))
         self.app.show_home()

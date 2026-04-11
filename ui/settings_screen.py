@@ -3,9 +3,6 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QSlider, QMessageBox, QFrame,
 )
 from PyQt5.QtCore import Qt
-import data.database as db
-
-
 class SettingsScreen(QWidget):
     def __init__(self, app):
         super().__init__()
@@ -81,7 +78,7 @@ class SettingsScreen(QWidget):
         root.addStretch()
 
     def _load(self):
-        settings = db.get_all_settings()
+        settings = self.app.db.get_all_settings()
         self._goal_edit.setText(settings.get("daily_goal", "10"))
         self._notify_edit.setText(settings.get("notify_time", "09:00"))
         self._api_edit.setText(settings.get("claude_api_key", ""))
@@ -95,10 +92,10 @@ class SettingsScreen(QWidget):
             QMessageBox.warning(self, "Validation",
                                 "Daily goal must be a whole number.")
             return
-        db.set_setting("daily_goal", goal)
-        db.set_setting("notify_time", self._notify_edit.text().strip())
-        db.set_setting("claude_api_key", self._api_edit.text().strip())
-        db.set_setting("decay_rate",
-                       f"{self._decay_slider.value() / 10:.1f}")
+        self.app.db.set_setting("daily_goal", goal)
+        self.app.db.set_setting("notify_time", self._notify_edit.text().strip())
+        self.app.db.set_setting("claude_api_key", self._api_edit.text().strip())
+        self.app.db.set_setting("decay_rate",
+                                f"{self._decay_slider.value() / 10:.1f}")
         QMessageBox.information(self, "Saved", "Settings saved.")
         self.app.show_home()

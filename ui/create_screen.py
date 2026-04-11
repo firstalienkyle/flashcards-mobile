@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import (
     QMessageBox, QFileDialog, QInputDialog,
 )
 from PyQt5.QtCore import Qt
-import data.database as db
 from data.models import Card
 
 
@@ -98,7 +97,7 @@ class CreateScreen(QWidget):
         root.addWidget(self._gen_scroll)
 
     def _load_decks(self):
-        decks = db.get_all_decks()
+        decks = self.app.db.get_all_decks()
         self._deck_map = {d.name: d.id for d in decks}
         self._deck_combo.clear()
         if decks:
@@ -118,7 +117,7 @@ class CreateScreen(QWidget):
     def _new_deck_dialog(self):
         name, ok = QInputDialog.getText(self, "New Deck", "Deck name:")
         if ok and name.strip():
-            d = db.create_deck(name.strip())
+            d = self.app.db.create_deck(name.strip())
             self._deck_map[d.name] = d.id
             self._deck_combo.addItem(d.name)
             self._deck_combo.setCurrentText(d.name)
@@ -135,9 +134,9 @@ class CreateScreen(QWidget):
             QMessageBox.warning(self, "No deck",
                                 "Please select or create a deck first.")
             return
-        db.create_card(Card(front=front, back=back,
-                            is_quiz=self._quiz_cb.isChecked(),
-                            deck_id=deck_id))
+        self.app.db.create_card(Card(front=front, back=back,
+                                     is_quiz=self._quiz_cb.isChecked(),
+                                     deck_id=deck_id))
         self._front_box.clear()
         self._back_box.clear()
         QMessageBox.information(self, "Saved", "Card saved successfully!")
@@ -196,7 +195,7 @@ class CreateScreen(QWidget):
             del_btn = QPushButton("✕")
             del_btn.setFixedSize(30, 30)
             del_btn.clicked.connect(
-                lambda _checked, rf=row_frame: rf.deleteLater()
+                lambda _checked, rf=row_frame: (rf.hide(), rf.deleteLater())
             )
             row_layout.addWidget(del_btn)
             self._gen_layout.addWidget(row_frame)
@@ -216,9 +215,9 @@ class CreateScreen(QWidget):
             front = front_e.text().strip()
             back  = back_e.text().strip()
             if front and back:
-                db.create_card(Card(front=front, back=back,
-                                    is_quiz=quiz_cb.isChecked(),
-                                    deck_id=deck_id))
+                self.app.db.create_card(Card(front=front, back=back,
+                                             is_quiz=quiz_cb.isChecked(),
+                                             deck_id=deck_id))
                 saved += 1
         QMessageBox.information(self, "Saved",
                                 f"{saved} cards saved to deck.")

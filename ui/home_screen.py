@@ -3,9 +3,6 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QProgressBar, QScrollArea, QFrame,
 )
 from PyQt5.QtCore import Qt
-import data.database as db
-
-
 class HomeScreen(QWidget):
     def __init__(self, app):
         super().__init__()
