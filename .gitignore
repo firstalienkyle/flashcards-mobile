@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.env
+*.db
+.superpowers/
+.pytest_cache/
+.venv/
+.DS_Store
