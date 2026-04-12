@@ -1,10 +1,10 @@
+from kivy.clock import Clock
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
-from kivy.uix.popup import Popup
 import threading
 
 
@@ -89,6 +89,5 @@ class SettingsScreen(Screen):
                     msg = 'Push complete.'
             except Exception as e:
                 msg = f'Error: {e}'
-            from kivy.clock import Clock
             Clock.schedule_once(lambda dt: setattr(self._status_label, 'text', msg))
         threading.Thread(target=_run, daemon=True).start()
