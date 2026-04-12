@@ -157,10 +157,12 @@ class CreateScreen(Screen):
         try:
             with open(path, encoding='utf-8') as f:
                 text = f.read()
-        except Exception:
+        except Exception as e:
+            self._show_error(f'Could not read file:\n{e}')
             return
         blocks = [b.strip() for b in text.split('\n\n') if b.strip()]
         if len(blocks) < 2:
+            self._show_error('No card pairs found.\nExpected: front block, blank line, back block, blank line, repeat.')
             return
         cards_data = []
         for i in range(0, len(blocks) - 1, 2):
@@ -170,8 +172,22 @@ class CreateScreen(Screen):
         unique = [cd for cd in cards_data
                   if cd['front'].strip().lower() not in existing]
         if not unique:
+            self._show_error('All cards already exist in this deck.')
             return
         self._show_generated(unique, deck_id)
+
+    def _show_error(self, message):
+        from kivy.uix.popup import Popup
+        from kivy.uix.boxlayout import BoxLayout
+        from kivy.uix.label import Label
+        from kivy.uix.button import Button
+        content = BoxLayout(orientation='vertical', padding=10, spacing=8)
+        content.add_widget(Label(text=message))
+        ok_btn = Button(text='OK', size_hint_y=None, height=44)
+        popup = Popup(title='Error', content=content, size_hint=(0.8, 0.4))
+        ok_btn.bind(on_press=popup.dismiss)
+        content.add_widget(ok_btn)
+        popup.open()
 
     def _show_generated(self, cards_data, deck_id):
         self._gen_rows = []
@@ -185,7 +201,7 @@ class CreateScreen(Screen):
             del_btn = Button(text='✕', size_hint_x=None, width=44)
             del_btn.bind(on_press=lambda _, r=row: (
                 self._gen_layout.remove_widget(r),
-                self._gen_rows.remove(r) if r in self._gen_rows else None,
+                [self._gen_rows.remove(t) for t in list(self._gen_rows) if t[2] is r],
             ))
             row.add_widget(front_e)
             row.add_widget(back_e)
