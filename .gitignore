@@ -1,8 +1,4 @@
 __pycache__/
 *.pyc
-.env
-*.db
-.superpowers/
-.pytest_cache/
-.venv/
-.DS_Store
+*.pyo
+*.pyd
