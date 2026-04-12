@@ -3,8 +3,8 @@ Run with: python sync_server.py
 Listens on 0.0.0.0:5000. Phone connects to http://<your-mac-ip>:5000
 """
 from flask import Flask, jsonify, request
-import computer_version.data.database as db
-from computer_version.data.models import Card, Deck
+import data.database as db
+from data.models import Card
 from datetime import datetime
 
 
@@ -36,6 +36,8 @@ def create_app() -> Flask:
     @app.route("/import", methods=["POST"])
     def import_data():
         payload = request.get_json(force=True)
+        if not payload or not isinstance(payload, dict):
+            return jsonify({"error": "invalid JSON"}), 400
 
         # Build existing deck id set once
         existing_decks = {deck.id: deck for deck in db.get_all_decks()}

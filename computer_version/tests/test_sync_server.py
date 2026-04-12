@@ -1,8 +1,8 @@
 import json
 import pytest
-from computer_version.data.models import Card
-import computer_version.data.database as db
-from computer_version.sync_server import create_app
+from data.models import Card
+import data.database as db
+from sync_server import create_app
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
