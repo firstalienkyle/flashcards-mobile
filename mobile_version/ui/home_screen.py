@@ -20,7 +20,8 @@ class HomeScreen(Screen):
         # Top bar
         top = BoxLayout(size_hint_y=None, height=48, spacing=8)
         top.add_widget(Label(text='Flashcards', font_size='20sp', bold=True,
-                             size_hint_x=None, width=200, halign='left'))
+                             size_hint_x=None, width=200, halign='left',
+                             text_size=(200, None)))
         top.add_widget(Widget())
         settings_btn = Button(text='⚙ Settings', size_hint_x=None, width=120)
         settings_btn.bind(on_press=lambda _: self.app.show_settings())
@@ -30,6 +31,7 @@ class HomeScreen(Screen):
         # Daily goal
         goal_row = BoxLayout(size_hint_y=None, height=40, spacing=8)
         self._goal_label = Label(text='Loading...', halign='left')
+        self._goal_label.bind(size=lambda lbl, sz: setattr(lbl, 'text_size', sz))
         goal_row.add_widget(self._goal_label)
         self._progress = ProgressBar(max=10, value=0, size_hint_x=None, width=200)
         goal_row.add_widget(self._progress)
@@ -59,7 +61,7 @@ class HomeScreen(Screen):
         self._load()
 
     def _load(self):
-        goal = int(self.app.db.get_setting('daily_goal') or 10)
+        goal = int(self.app.db.get_setting('daily_goal') or 20)
         count = self.app.db.get_today_reviewed_count()
         self._goal_label.text = f'{count} / {goal} cards reviewed today'
         self._progress.max = goal
@@ -77,5 +79,6 @@ class HomeScreen(Screen):
                 size_hint_y=None, height=100,
                 halign='left', valign='top',
             )
+            tile.bind(size=lambda btn, sz: setattr(btn, 'text_size', sz))
             tile.bind(on_press=lambda _, did=deck.id: self.app.show_deck(did))
             self._grid.add_widget(tile)
