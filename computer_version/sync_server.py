@@ -36,23 +36,43 @@ def create_app() -> Flask:
     @app.route("/import", methods=["POST"])
     def import_data():
         payload = request.get_json(force=True)
+
+        # Build existing deck id set once
+        existing_decks = {deck.id: deck for deck in db.get_all_decks()}
+
+        # Map phone deck id -> desktop deck id
+        deck_id_map = {}
         for d in payload.get("decks", []):
-            existing = db.get_all_decks()
-            ids = {deck.id for deck in existing}
-            if d["id"] not in ids:
-                db.create_deck(d["name"])
+            if d["id"] in existing_decks:
+                # Deck already exists on desktop — map to same id
+                deck_id_map[d["id"]] = d["id"]
+            else:
+                # New deck — find match by name or create
+                name_match = next((dk for dk in existing_decks.values() if dk.name == d["name"]), None)
+                if name_match:
+                    deck_id_map[d["id"]] = name_match.id
+                else:
+                    new_deck = db.create_deck(d["name"])
+                    deck_id_map[d["id"]] = new_deck.id
+                    existing_decks[new_deck.id] = new_deck
+
+        # Import cards using remapped deck ids
+        existing_card_ids = {card.id for card in db.get_all_cards()}
         for c in payload.get("cards", []):
-            existing_cards = db.get_all_cards()
-            existing_ids = {card.id for card in existing_cards}
-            if c["id"] not in existing_ids:
-                card = Card(
-                    front=c["front"], back=c["back"],
-                    is_quiz=c["is_quiz"], memory_level=c["memory_level"],
-                    deck_id=c["deck_id"],
-                    last_reviewed=datetime.fromisoformat(c["last_reviewed"]) if c["last_reviewed"] else None,
-                    review_count=c["review_count"],
-                )
-                db.create_card(card)
+            if c["id"] in existing_card_ids:
+                continue
+            local_deck_id = deck_id_map.get(c["deck_id"])
+            if local_deck_id is None:
+                continue  # skip orphaned card
+            card = Card(
+                front=c["front"], back=c["back"],
+                is_quiz=c["is_quiz"], memory_level=c["memory_level"],
+                deck_id=local_deck_id,
+                last_reviewed=datetime.fromisoformat(c["last_reviewed"]) if c["last_reviewed"] else None,
+                review_count=c["review_count"],
+            )
+            db.create_card(card)
+
         return jsonify({"status": "ok"})
 
     return app
