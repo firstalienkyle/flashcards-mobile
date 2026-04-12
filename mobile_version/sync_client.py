@@ -1,6 +1,6 @@
 import requests
 import data.database as db
-from data.models import Card, Deck
+from data.models import Card
 from datetime import datetime
 
 
@@ -14,6 +14,9 @@ class SyncClient:
         resp.raise_for_status()
         payload = resp.json()
 
+        if not isinstance(payload, dict) or "decks" not in payload or "cards" not in payload:
+            raise ValueError(f"Unexpected export payload shape: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
+
         # Wipe and re-import all decks (cascade deletes cards too)
         for deck in db.get_all_decks():
             db.delete_deck(deck.id)
@@ -24,8 +27,8 @@ class SyncClient:
         all_decks = db.get_all_decks()
         deck_name_to_id = {d.name: d.id for d in all_decks}
 
+        desktop_decks = payload["decks"]
         for c in payload["cards"]:
-            desktop_decks = payload["decks"]
             deck_name = next((d["name"] for d in desktop_decks if d["id"] == c["deck_id"]), None)
             local_deck_id = deck_name_to_id.get(deck_name)
             if local_deck_id is None:
