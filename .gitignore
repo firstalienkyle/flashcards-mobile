@@ -1,10 +1,26 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
-*.db
-.superpowers/
-.pytest_cache/
 .venv/
+.env
+
+# Data
+*.db
+
+# Build
+.buildozer/
+bin/
+.pytest_cache/
+
+# Planning docs (internal)
+docs/superpowers/
+computer_version/docs/
+.superpowers/
+.remember/
+*.remember/
+
+# OS
 .DS_Store
+Thumbs.db
