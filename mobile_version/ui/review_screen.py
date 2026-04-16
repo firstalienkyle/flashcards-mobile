@@ -6,7 +6,6 @@ from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.graphics import Color, RoundedRectangle
-from kivy.clock import Clock
 from services.review_scheduler import (
     build_review_queue, answers_match, apply_memory_delta,
 )
@@ -139,9 +138,6 @@ class ReviewScreen(Screen):
         self._feedback_label = lbl('', font_size='17sp', height=38, halign='center')
         root.add_widget(self._feedback_label)
 
-        self._explanation_label = lbl('', font_size=FONT_SMALL, color=MUTED,
-                                       height=56, halign='left')
-        root.add_widget(self._explanation_label)
 
         # Nav
         nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
@@ -250,7 +246,6 @@ class ReviewScreen(Screen):
         self._side_label.text = 'FRONT'
         self._card_label.text = card.front
         self._feedback_label.text = ''
-        self._explanation_label.text = ''
         self._quiz_input.text = ''
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True
@@ -300,7 +295,6 @@ class ReviewScreen(Screen):
             self._incorrect += 1
             new_level = apply_memory_delta(card, 'incorrect', already_seen)
             self._record(card, 'incorrect', new_level)
-            self._fetch_explanation(card)
         self._quiz_input.disabled = True
         self._action_btn.text = 'Next'
 
@@ -310,15 +304,6 @@ class ReviewScreen(Screen):
         )
         db.update_card_memory(card.id, new_level, datetime.now())
         card.memory_level = new_level
-
-    def _fetch_explanation(self, card):
-        def _run():
-            try:
-                text = self.app.claude.explain_answer(card.front, card.back)
-            except Exception:
-                text = ''
-            Clock.schedule_once(lambda dt: setattr(self._explanation_label, 'text', text))
-        threading.Thread(target=_run, daemon=True).start()
 
     def _go_next(self):
         if self._index < len(self._queue) - 1:

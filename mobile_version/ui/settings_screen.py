@@ -90,18 +90,6 @@ class SettingsScreen(Screen):
         sync_row.add_widget(push)
         root.add_widget(sync_row)
 
-        # ── Claude setup ─────────────────────────────────────────────────────
-        root.add_widget(lbl('Claude AI  (one-time setup)', font_size=FONT_SMALL,
-                             color=MUTED, bold=True, height=34))
-
-        row, inp = _field_row('API Key', 'claude_api_key', 'sk-ant-...', password=True)
-        self._inputs['claude_api_key'] = inp
-        root.add_widget(row)
-
-        save_key = btn('Save API Key', color=SECONDARY)
-        save_key.bind(on_press=self._save)
-        root.add_widget(save_key)
-
         self._status = lbl('', font_size=FONT_SMALL, color=MUTED, height=30)
         root.add_widget(self._status)
         root.add_widget(Widget())
@@ -117,15 +105,9 @@ class SettingsScreen(Screen):
             val = inp.text.strip()
             if val:
                 self.app.db.set_setting(key, val)
-        # Keep sync client URL in sync
         ip = self.app.db.get_setting('desktop_ip') or ''
         if ip:
             self.app.sync.base_url = ip.rstrip('/')
-        # Keep claude service api key in sync
-        api_key = self.app.db.get_setting('claude_api_key') or ''
-        if api_key:
-            import anthropic
-            self.app.claude.client = anthropic.Anthropic(api_key=api_key)
         self._status.text = 'Saved.'
 
     def _sync(self, direction):

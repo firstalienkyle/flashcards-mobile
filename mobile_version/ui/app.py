@@ -5,11 +5,10 @@ from kivy.uix.screenmanager import ScreenManager
 class FlashcardsApp(App):
     title = 'Flashcards'
 
-    def __init__(self, db, review_scheduler_mod, claude_service, sync_client, **kwargs):
+    def __init__(self, db, review_scheduler_mod, sync_client, **kwargs):
         super().__init__(**kwargs)
         self.db = db
         self.rs = review_scheduler_mod
-        self.claude = claude_service
         self.sync = sync_client
         self.sm = None
 

@@ -13,6 +13,7 @@ version = 1.0.0
 # anthropic SDK is replaced with plain requests (pydantic-core is Rust, can't cross-compile).
 # sqlite3 is a Python built-in — do NOT list it here.
 requirements = python3,kivy==2.3.0,pillow,requests,plyer,openpyxl,et_xmlfile
+# Note: no anthropic SDK - Claude removed. requests is still needed for WiFi sync.
 
 orientation = portrait
 fullscreen = 0
