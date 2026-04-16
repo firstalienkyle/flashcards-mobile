@@ -2,12 +2,16 @@ from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
+from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
-from kivy.uix.widget import Widget
 from data.models import Card
+from ui.theme import (
+    apply_bg, btn, lbl,
+    SURFACE, SECONDARY, DANGER, MUTED, TEXT,
+    FONT_BODY, FONT_TITLE,
+    BTN_H, ROW_H, PAD, GAP,
+)
 
 
 class DeckScreen(Screen):
@@ -18,27 +22,38 @@ class DeckScreen(Screen):
         self._build()
 
     def _build(self):
-        root = BoxLayout(orientation='vertical', padding=16, spacing=10)
+        apply_bg(self)
+        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
-        top = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        back_btn = Button(text='← Back', size_hint_x=None, width=100)
-        back_btn.bind(on_press=lambda _: self.app.show_home())
-        top.add_widget(back_btn)
-        self._title = Label(text='Deck', font_size='18sp', bold=True)
-        top.add_widget(self._title)
-        top.add_widget(Widget())
-        add_btn = Button(text='+ Card', size_hint_x=None, width=90)
-        add_btn.bind(on_press=lambda _: self.app.show_create(self._deck_id))
-        top.add_widget(add_btn)
-        root.add_widget(top)
+        # ── Header ──────────────────────────────────────────────────────────
+        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
+        back = btn('Back', color=SECONDARY, height=ROW_H)
+        back.size_hint_x = 0.25
+        back.bind(on_press=lambda _: self.app.show_home())
+        header.add_widget(back)
+        self._title = lbl('Deck', font_size=FONT_TITLE, bold=True, height=ROW_H)
+        header.add_widget(self._title)
+        header.add_widget(Widget())
+        add = btn('+ Card', height=ROW_H)
+        add.size_hint_x = 0.28
+        add.bind(on_press=lambda _: self.app.show_create(self._deck_id))
+        header.add_widget(add)
+        root.add_widget(header)
 
-        self._search = TextInput(hint_text='Search cards...', size_hint_y=None,
-                                  height=40, multiline=False)
+        # ── Search ───────────────────────────────────────────────────────────
+        self._search = TextInput(
+            hint_text='Search cards...',
+            size_hint_y=None, height=40,
+            multiline=False,
+            foreground_color=TEXT,
+            background_color=SURFACE,
+        )
         self._search.bind(text=self._on_search)
         root.add_widget(self._search)
 
+        # ── Card list ─────────────────────────────────────────────────────────
         scroll = ScrollView()
-        self._card_list = GridLayout(cols=1, spacing=4, size_hint_y=None, padding=4)
+        self._card_list = GridLayout(cols=1, spacing=6, size_hint_y=None, padding=0)
         self._card_list.bind(minimum_height=self._card_list.setter('height'))
         scroll.add_widget(self._card_list)
         root.add_widget(scroll)
@@ -61,19 +76,26 @@ class DeckScreen(Screen):
 
         self._card_list.clear_widgets()
         for card in cards:
-            row = BoxLayout(size_hint_y=None, height=56, spacing=6)
-            lbl = Label(
-                text=f'{card.front[:40]}  →  {card.back[:40]}',
-                halign='left', size_hint_x=1,
+            row = BoxLayout(size_hint_y=None, height=58, spacing=6)
+
+            card_btn = btn(
+                f'{card.front[:50]}  ->  {card.back[:50]}',
+                color=SURFACE, height=58,
             )
-            lbl.bind(size=lambda lb, sz: setattr(lb, 'text_size', sz))
-            row.add_widget(lbl)
-            edit_btn = Button(text='Edit', size_hint_x=None, width=70)
-            edit_btn.bind(on_press=lambda _, c=card: self._edit_dialog(c))
-            row.add_widget(edit_btn)
-            del_btn = Button(text='Del', size_hint_x=None, width=60)
-            del_btn.bind(on_press=lambda _, cid=card.id: self._delete_card(cid))
-            row.add_widget(del_btn)
+            card_btn.halign = 'left'
+            card_btn.bind(size=lambda b, _: setattr(b, 'text_size', (b.width - 12, None)))
+            row.add_widget(card_btn)
+
+            edit = btn('Edit', color=SECONDARY, height=BTN_H)
+            edit.size_hint_x = 0.2
+            edit.bind(on_press=lambda _, c=card: self._edit_dialog(c))
+            row.add_widget(edit)
+
+            delete = btn('Del', color=DANGER, height=BTN_H)
+            delete.size_hint_x = 0.18
+            delete.bind(on_press=lambda _, cid=card.id: self._delete_card(cid))
+            row.add_widget(delete)
+
             self._card_list.add_widget(row)
 
     def _on_search(self, instance, value):
@@ -84,16 +106,17 @@ class DeckScreen(Screen):
         self._load(filter_text=self._search.text)
 
     def _edit_dialog(self, card):
-        content = BoxLayout(orientation='vertical', padding=10, spacing=8)
-        front_input = TextInput(text=card.front, multiline=True, size_hint_y=None, height=80)
-        back_input = TextInput(text=card.back, multiline=True, size_hint_y=None, height=80)
-        content.add_widget(Label(text='Front:', size_hint_y=None, height=28))
+        content = BoxLayout(orientation='vertical', padding=12, spacing=8)
+        front_input = TextInput(text=card.front, multiline=True,
+                                size_hint_y=None, height=80)
+        back_input = TextInput(text=card.back, multiline=True,
+                               size_hint_y=None, height=80)
+        content.add_widget(lbl('Front:', height=26))
         content.add_widget(front_input)
-        content.add_widget(Label(text='Back:', size_hint_y=None, height=28))
+        content.add_widget(lbl('Back:', height=26))
         content.add_widget(back_input)
-        btn_row = BoxLayout(size_hint_y=None, height=44, spacing=8)
 
-        popup = Popup(title='Edit Card', content=content, size_hint=(0.9, 0.7))
+        popup = Popup(title='Edit Card', content=content, size_hint=(0.9, 0.65))
 
         def _save(_):
             card.front = front_input.text.strip()
@@ -103,11 +126,12 @@ class DeckScreen(Screen):
                 popup.dismiss()
                 self._load(filter_text=self._search.text)
 
-        save_btn = Button(text='Save')
-        save_btn.bind(on_press=_save)
-        cancel_btn = Button(text='Cancel')
-        cancel_btn.bind(on_press=popup.dismiss)
-        btn_row.add_widget(save_btn)
-        btn_row.add_widget(cancel_btn)
+        btn_row = BoxLayout(size_hint_y=None, height=48, spacing=8)
+        save = btn('Save')
+        save.bind(on_press=_save)
+        cancel = btn('Cancel', color=SECONDARY)
+        cancel.bind(on_press=popup.dismiss)
+        btn_row.add_widget(save)
+        btn_row.add_widget(cancel)
         content.add_widget(btn_row)
         popup.open()

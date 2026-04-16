@@ -2,15 +2,21 @@ import threading
 from datetime import datetime
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.textinput import TextInput
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.widget import Widget
+from kivy.uix.textinput import TextInput
+from kivy.graphics import Color, RoundedRectangle
 from kivy.clock import Clock
 from services.review_scheduler import (
     build_review_queue, answers_match, apply_memory_delta,
 )
 import data.database as db
+from ui.theme import (
+    apply_bg, btn, lbl,
+    BG, SURFACE, PRIMARY, SECONDARY, SUCCESS, DANGER, MUTED, TEXT,
+    FONT_TITLE, FONT_BODY, FONT_SMALL,
+    BTN_H, ROW_H, PAD, GAP,
+)
 
 
 def _extract_word(text: str) -> str:
@@ -21,7 +27,7 @@ def _extract_word(text: str) -> str:
     return text.strip()
 
 
-def _speak(text: str, lang: str = 'en'):
+def _speak(text: str):
     def _run():
         try:
             from plyer import tts
@@ -31,6 +37,17 @@ def _speak(text: str, lang: str = 'en'):
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _card_panel(ref):
+    """Return a BoxLayout that draws a rounded-rect surface background."""
+    panel = BoxLayout(orientation='vertical', padding=20, spacing=10)
+    with panel.canvas.before:
+        ref['color'] = Color(*SURFACE)
+        ref['rect'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[12])
+    panel.bind(pos=lambda w, _: setattr(ref['rect'], 'pos', w.pos))
+    panel.bind(size=lambda w, _: setattr(ref['rect'], 'size', w.size))
+    return panel
+
+
 class ReviewScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
@@ -38,71 +55,146 @@ class ReviewScreen(Screen):
         self._queue = []
         self._index = 0
         self._seen = set()
+        self._correct = 0
+        self._incorrect = 0
         self._session_id = None
         self._showing_front = True
-        self._play_counts = {}
+        self._review_root = None
+        self._complete_root = None
         self._build()
 
+    # ── Build ─────────────────────────────────────────────────────────────────
+
     def _build(self):
-        root = BoxLayout(orientation='vertical', padding=16, spacing=10)
+        apply_bg(self)
 
-        top = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        home_btn = Button(text='← Home', size_hint_x=None, width=100)
-        home_btn.bind(on_press=lambda _: self._end_session())
-        top.add_widget(home_btn)
-        top.add_widget(Widget())
-        self._progress_label = Label(text='')
-        top.add_widget(self._progress_label)
-        root.add_widget(top)
+        # We keep both views as children; only one is visible at a time
+        self._review_root = self._build_review()
+        self._complete_root = self._build_complete()
+        self._complete_root.opacity = 0
+        self._complete_root.disabled = True
 
-        # Card area
-        self._side_label = Label(text='FRONT', size_hint_y=None, height=24,
-                                  color=(0.5, 0.5, 0.5, 1), font_size='11sp')
+        wrapper = BoxLayout()
+        wrapper.add_widget(self._review_root)
+        wrapper.add_widget(self._complete_root)
+        self.add_widget(wrapper)
+
+    def _build_review(self):
+        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
+
+        # Header
+        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
+        home_btn = btn('Home', color=SECONDARY, height=ROW_H)
+        home_btn.size_hint_x = 0.25
+        home_btn.bind(on_press=lambda _: self._end_session(go_home=True))
+        header.add_widget(home_btn)
+        header.add_widget(Widget())
+        self._progress_label = lbl('', font_size=FONT_SMALL, color=MUTED,
+                                    height=ROW_H, halign='right')
+        header.add_widget(self._progress_label)
+        root.add_widget(header)
+
+        # FRONT / BACK badge
+        self._side_label = lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
+                                height=24, halign='center')
         root.add_widget(self._side_label)
 
-        self._card_label = Label(text='', font_size='20sp', bold=True,
-                                  size_hint_y=1, halign='left', valign='top',
-                                  text_size=(None, None))
-        self._card_label.bind(size=lambda inst, val: setattr(inst, 'text_size', (val[0], None)))
-        root.add_widget(self._card_label)
+        # Card panel — centred text inside a surface box
+        card_ref = {}
+        panel = _card_panel(card_ref)
 
-        self._speak_btn = Button(text='🔊 Speak', size_hint_y=None, height=44,
-                                  size_hint_x=None, width=120)
+        anchor = AnchorLayout(anchor_x='center', anchor_y='center')
+        self._card_label = lbl('', font_size='22sp', bold=True,
+                                halign='center', valign='middle')
+        self._card_label.bind(
+            size=lambda inst, _: setattr(inst, 'text_size', (inst.width, None))
+        )
+        anchor.add_widget(self._card_label)
+        panel.add_widget(anchor)
+        root.add_widget(panel)  # takes remaining vertical space
+
+        # Speak
+        speak_row = BoxLayout(size_hint_y=None, height=BTN_H)
+        self._speak_btn = btn('Speak', color=SECONDARY, height=BTN_H)
+        self._speak_btn.size_hint_x = 0.4
         self._speak_btn.bind(on_press=lambda _: self._play_audio())
-        root.add_widget(self._speak_btn)
+        speak_row.add_widget(self._speak_btn)
+        speak_row.add_widget(Widget())
+        root.add_widget(speak_row)
 
-        self._quiz_input = TextInput(hint_text='Type your answer…', size_hint_y=None,
-                                      height=44, multiline=False)
+        # Quiz input
+        self._quiz_input = TextInput(
+            hint_text='Type your answer...',
+            size_hint_y=None, height=50,
+            multiline=False,
+            background_color=SURFACE,
+            foreground_color=TEXT,
+            font_size=FONT_BODY,
+        )
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True
         root.add_widget(self._quiz_input)
 
-        self._feedback_label = Label(text='', size_hint_y=None, height=36,
-                                      font_size='16sp')
+        # Feedback
+        self._feedback_label = lbl('', font_size='17sp', height=38, halign='center')
         root.add_widget(self._feedback_label)
 
-        self._explanation_label = Label(text='', size_hint_y=None, height=60,
-                                         color=(0.5, 0.5, 0.5, 1), font_size='12sp',
-                                         halign='left', valign='top')
-        self._explanation_label.bind(size=lambda inst, val: setattr(inst, 'text_size', (val[0], None)))
+        self._explanation_label = lbl('', font_size=FONT_SMALL, color=MUTED,
+                                       height=56, halign='left')
         root.add_widget(self._explanation_label)
 
-        # Nav buttons
-        nav = BoxLayout(size_hint_y=None, height=52, spacing=8)
-        self._prev_btn = Button(text='← Prev', size_hint_x=None, width=100)
+        # Nav
+        nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        self._prev_btn = btn('Prev', color=SECONDARY)
+        self._prev_btn.size_hint_x = 0.25
         self._prev_btn.bind(on_press=lambda _: self._go_prev())
         nav.add_widget(self._prev_btn)
 
-        self._action_btn = Button(text='Flip', size_hint_x=1)
+        self._action_btn = btn('Flip')
         self._action_btn.bind(on_press=lambda _: self._on_action())
         nav.add_widget(self._action_btn)
 
-        self._next_btn = Button(text='Next →', size_hint_x=None, width=100)
+        self._next_btn = btn('Next', color=SECONDARY)
+        self._next_btn.size_hint_x = 0.25
         self._next_btn.bind(on_press=lambda _: self._go_next())
         nav.add_widget(self._next_btn)
         root.add_widget(nav)
 
-        self.add_widget(root)
+        return root
+
+    def _build_complete(self):
+        root = BoxLayout(orientation='vertical', padding=PAD * 2, spacing=GAP * 2)
+        root.add_widget(Widget())  # push content to centre
+
+        root.add_widget(lbl('Session Complete', font_size='28sp', bold=True,
+                             halign='center', height=50))
+
+        self._complete_count = lbl('', font_size=FONT_TITLE, halign='center',
+                                    color=MUTED, height=40)
+        root.add_widget(self._complete_count)
+
+        self._complete_correct = lbl('', font_size=FONT_BODY, halign='center',
+                                      color=SUCCESS, height=34)
+        root.add_widget(self._complete_correct)
+
+        self._complete_incorrect = lbl('', font_size=FONT_BODY, halign='center',
+                                        color=DANGER, height=34)
+        root.add_widget(self._complete_incorrect)
+
+        root.add_widget(Widget(size_hint_y=None, height=30))
+
+        go_home = btn('Go Home')
+        go_home.bind(on_press=lambda _: self.app.show_home())
+        root.add_widget(go_home)
+
+        review_again = btn('Review Again', color=SECONDARY)
+        review_again.bind(on_press=lambda _: self._restart())
+        root.add_widget(review_again)
+
+        root.add_widget(Widget())  # push content to centre
+        return root
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def on_enter(self):
         self._start_session()
@@ -111,13 +203,46 @@ class ReviewScreen(Screen):
         decay_rate = float(self.app.db.get_setting('decay_rate') or 5)
         all_cards = db.get_all_cards()
         self._queue = build_review_queue(all_cards, decay_rate)
-        if not self._queue:
-            self._card_label.text = 'No cards to review!'
-            return
         self._index = 0
         self._seen = set()
+        self._correct = 0
+        self._incorrect = 0
+
+        self._show_review_view()
+
+        if not self._queue:
+            self._card_label.text = 'No cards to review yet.\nAdd some cards first!'
+            self._action_btn.disabled = True
+            return
+
         self._session_id = db.create_session().id
         self._show_card()
+
+    def _restart(self):
+        if self._session_id:
+            db.end_session(self._session_id, len(self._seen))
+            self._session_id = None
+        self._start_session()
+
+    # ── View switching ────────────────────────────────────────────────────────
+
+    def _show_review_view(self):
+        self._review_root.opacity = 1
+        self._review_root.disabled = False
+        self._complete_root.opacity = 0
+        self._complete_root.disabled = True
+
+    def _show_complete_view(self):
+        reviewed = len(self._seen)
+        self._complete_count.text = f'{reviewed} card{"s" if reviewed != 1 else ""} reviewed'
+        self._complete_correct.text = f'Correct: {self._correct}'
+        self._complete_incorrect.text = f'Incorrect: {self._incorrect}'
+        self._review_root.opacity = 0
+        self._review_root.disabled = True
+        self._complete_root.opacity = 1
+        self._complete_root.disabled = False
+
+    # ── Card display ──────────────────────────────────────────────────────────
 
     def _show_card(self):
         card = self._queue[self._index]
@@ -130,6 +255,7 @@ class ReviewScreen(Screen):
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True
         self._action_btn.text = 'Flip'
+        self._action_btn.disabled = False
         self._progress_label.text = f'{self._index + 1} / {len(self._queue)}'
         self._speak_btn.opacity = 1
         self._speak_btn.disabled = False
@@ -155,27 +281,28 @@ class ReviewScreen(Screen):
             self._seen.add(card.id)
             new_level = apply_memory_delta(card, 'seen', already_seen)
             self._record(card, 'seen', new_level)
-            self._action_btn.text = 'Next →'
+            self._action_btn.text = 'Next'
 
     def _submit_quiz(self):
         card = self._queue[self._index]
         user_ans = self._quiz_input.text.strip()
-        correct = card.back
         already_seen = card.id in self._seen
         self._seen.add(card.id)
-        if answers_match(user_ans, correct):
-            self._feedback_label.text = '✓ Correct!'
-            self._feedback_label.color = (0.2, 0.8, 0.2, 1)
+        if answers_match(user_ans, card.back):
+            self._feedback_label.text = 'Correct!'
+            self._feedback_label.color = SUCCESS
+            self._correct += 1
             new_level = apply_memory_delta(card, 'correct', already_seen)
             self._record(card, 'correct', new_level)
         else:
-            self._feedback_label.text = f'✗ Incorrect — {_extract_word(correct)}'
-            self._feedback_label.color = (0.9, 0.2, 0.2, 1)
+            self._feedback_label.text = f'Incorrect  -  {_extract_word(card.back)}'
+            self._feedback_label.color = DANGER
+            self._incorrect += 1
             new_level = apply_memory_delta(card, 'incorrect', already_seen)
             self._record(card, 'incorrect', new_level)
             self._fetch_explanation(card)
         self._quiz_input.disabled = True
-        self._action_btn.text = 'Next →'
+        self._action_btn.text = 'Next'
 
     def _record(self, card, result, new_level):
         db.record_session_card_result(
@@ -198,7 +325,7 @@ class ReviewScreen(Screen):
             self._index += 1
             self._show_card()
         else:
-            self._end_session()
+            self._end_session(go_home=False)
 
     def _go_prev(self):
         if self._index > 0:
@@ -207,12 +334,14 @@ class ReviewScreen(Screen):
 
     def _play_audio(self):
         card = self._queue[self._index]
-        lang = 'es' if self._showing_front else 'en'
         text = card.front if self._showing_front else card.back
-        _speak(text, lang=lang)
+        _speak(text)
 
-    def _end_session(self):
+    def _end_session(self, go_home=False):
         if self._session_id:
             db.end_session(self._session_id, len(self._seen))
             self._session_id = None
-        self.app.show_home()
+        if go_home:
+            self.app.show_home()
+        else:
+            self._show_complete_view()

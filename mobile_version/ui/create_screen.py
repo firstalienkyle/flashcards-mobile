@@ -1,14 +1,18 @@
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.popup import Popup
-from kivy.uix.widget import Widget
 from data.models import Card
+from ui.theme import (
+    apply_bg, btn, lbl,
+    SURFACE, SECONDARY, DANGER, MUTED, TEXT,
+    FONT_TITLE, FONT_BODY,
+    BTN_H, ROW_H, PAD, GAP,
+)
 
 
 class CreateScreen(Screen):
@@ -21,53 +25,69 @@ class CreateScreen(Screen):
         self._build()
 
     def _build(self):
-        root = BoxLayout(orientation='vertical', padding=16, spacing=10)
+        apply_bg(self)
+        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
-        top = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        back_btn = Button(text='← Back', size_hint_x=None, width=100)
-        back_btn.bind(on_press=lambda _: self.app.show_home())
-        top.add_widget(back_btn)
-        top.add_widget(Label(text='New Card', font_size='18sp', bold=True))
-        top.add_widget(Widget())
-        root.add_widget(top)
+        # ── Header ──────────────────────────────────────────────────────────
+        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
+        back = btn('Back', color=SECONDARY, height=ROW_H)
+        back.size_hint_x = 0.25
+        back.bind(on_press=lambda _: self.app.show_home())
+        header.add_widget(back)
+        header.add_widget(lbl('New Card', font_size=FONT_TITLE, bold=True,
+                               height=ROW_H))
+        header.add_widget(Widget())
+        root.add_widget(header)
 
-        # Deck selector
+        # ── Deck row ─────────────────────────────────────────────────────────
         deck_row = BoxLayout(size_hint_y=None, height=44, spacing=8)
-        deck_row.add_widget(Label(text='Deck:', size_hint_x=None, width=60))
-        self._deck_spinner = Spinner(text='Select deck', values=[], size_hint_x=1)
+        deck_row.add_widget(lbl('Deck:', height=44, size_hint_x=None, width=55))
+        self._deck_spinner = Spinner(
+            text='Select deck', values=[],
+            size_hint_x=1, size_hint_y=None, height=44,
+            background_normal='', background_color=SURFACE,
+            color=TEXT,
+        )
         deck_row.add_widget(self._deck_spinner)
-        new_deck_btn = Button(text='+ New', size_hint_x=None, width=80)
-        new_deck_btn.bind(on_press=self._new_deck_dialog)
-        deck_row.add_widget(new_deck_btn)
+        new_deck = btn('+ New', color=SECONDARY, height=44)
+        new_deck.size_hint_x = 0.25
+        new_deck.bind(on_press=self._new_deck_dialog)
+        deck_row.add_widget(new_deck)
         root.add_widget(deck_row)
 
-        # Front / Back inputs
-        root.add_widget(Label(text='Front:', size_hint_y=None, height=28, halign='left'))
-        self._front_input = TextInput(multiline=True, size_hint_y=None, height=80)
+        # ── Front / Back inputs ──────────────────────────────────────────────
+        root.add_widget(lbl('Front:', height=26, color=MUTED))
+        self._front_input = TextInput(
+            multiline=True, size_hint_y=None, height=80,
+            background_color=SURFACE, foreground_color=TEXT,
+        )
         root.add_widget(self._front_input)
-        root.add_widget(Label(text='Back:', size_hint_y=None, height=28, halign='left'))
-        self._back_input = TextInput(multiline=True, size_hint_y=None, height=80)
+
+        root.add_widget(lbl('Back:', height=26, color=MUTED))
+        self._back_input = TextInput(
+            multiline=True, size_hint_y=None, height=80,
+            background_color=SURFACE, foreground_color=TEXT,
+        )
         root.add_widget(self._back_input)
 
-        # Buttons
-        btn_row = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        save_btn = Button(text='Save Card', size_hint_x=None, width=130)
-        save_btn.bind(on_press=self._save_card)
-        btn_row.add_widget(save_btn)
-        txt_btn = Button(text='📄 Import TXT', size_hint_x=None, width=150)
-        txt_btn.bind(on_press=self._import_txt_dialog)
-        btn_row.add_widget(txt_btn)
-        btn_row.add_widget(Widget())
+        # ── Buttons ──────────────────────────────────────────────────────────
+        btn_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        save = btn('Save Card')
+        save.bind(on_press=self._save_card)
+        btn_row.add_widget(save)
+        import_txt = btn('Import TXT', color=SECONDARY)
+        import_txt.bind(on_press=self._import_txt_dialog)
+        btn_row.add_widget(import_txt)
         root.add_widget(btn_row)
 
-        # Generated cards area
-        self._gen_label = Label(text='Imported cards — review before saving',
-                                size_hint_y=None, height=28, bold=True)
+        # ── Imported cards preview ────────────────────────────────────────────
+        self._gen_label = lbl('Imported cards - review before saving',
+                               bold=True, height=32)
         self._gen_label.opacity = 0
         root.add_widget(self._gen_label)
 
         scroll = ScrollView()
-        self._gen_layout = GridLayout(cols=1, spacing=4, size_hint_y=None, padding=4)
+        self._gen_layout = GridLayout(cols=1, spacing=6, size_hint_y=None, padding=0)
         self._gen_layout.bind(minimum_height=self._gen_layout.setter('height'))
         scroll.add_widget(self._gen_layout)
         root.add_widget(scroll)
@@ -93,12 +113,11 @@ class CreateScreen(Screen):
         return self._deck_map.get(self._deck_spinner.text)
 
     def _new_deck_dialog(self, _):
-        content = BoxLayout(orientation='vertical', padding=10, spacing=8)
+        content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         name_input = TextInput(hint_text='Deck name', multiline=False,
                                size_hint_y=None, height=44)
         content.add_widget(name_input)
-        btn_row = BoxLayout(size_hint_y=None, height=44, spacing=8)
-        popup = Popup(title='New Deck', content=content, size_hint=(0.8, 0.4))
+        popup = Popup(title='New Deck', content=content, size_hint=(0.8, 0.35))
 
         def _create(_):
             name = name_input.text.strip()
@@ -109,12 +128,13 @@ class CreateScreen(Screen):
                 self._deck_spinner.text = d.name
                 popup.dismiss()
 
-        create_btn = Button(text='Create')
-        create_btn.bind(on_press=_create)
-        cancel_btn = Button(text='Cancel')
-        cancel_btn.bind(on_press=popup.dismiss)
-        btn_row.add_widget(create_btn)
-        btn_row.add_widget(cancel_btn)
+        btn_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        create = btn('Create')
+        create.bind(on_press=_create)
+        cancel = btn('Cancel', color=SECONDARY)
+        cancel.bind(on_press=popup.dismiss)
+        btn_row.add_widget(create)
+        btn_row.add_widget(cancel)
         content.add_widget(btn_row)
         popup.open()
 
@@ -129,24 +149,24 @@ class CreateScreen(Screen):
         self._back_input.text = ''
 
     def _import_txt_dialog(self, _):
-        content = BoxLayout(orientation='vertical', padding=10, spacing=8)
+        content = BoxLayout(orientation='vertical', padding=12, spacing=8)
+        content.add_widget(lbl('Full path to .txt file:', height=28, color=MUTED))
         path_input = TextInput(hint_text='/path/to/file.txt', multiline=False,
                                size_hint_y=None, height=44)
-        content.add_widget(Label(text='Enter full path to TXT file:', size_hint_y=None, height=28))
         content.add_widget(path_input)
-        btn_row = BoxLayout(size_hint_y=None, height=44, spacing=8)
-        popup = Popup(title='Import TXT', content=content, size_hint=(0.9, 0.45))
+        popup = Popup(title='Import TXT', content=content, size_hint=(0.9, 0.38))
 
         def _load(_):
             popup.dismiss()
             self._import_txt(path_input.text.strip())
 
-        ok_btn = Button(text='Import')
-        ok_btn.bind(on_press=_load)
-        cancel_btn = Button(text='Cancel')
-        cancel_btn.bind(on_press=popup.dismiss)
-        btn_row.add_widget(ok_btn)
-        btn_row.add_widget(cancel_btn)
+        btn_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        ok = btn('Import')
+        ok.bind(on_press=_load)
+        cancel = btn('Cancel', color=SECONDARY)
+        cancel.bind(on_press=popup.dismiss)
+        btn_row.add_widget(ok)
+        btn_row.add_widget(cancel)
         content.add_widget(btn_row)
         popup.open()
 
@@ -157,12 +177,10 @@ class CreateScreen(Screen):
         try:
             with open(path, encoding='utf-8') as f:
                 text = f.read()
-        except Exception as e:
-            self._show_error(f'Could not read file:\n{e}')
+        except Exception:
             return
         blocks = [b.strip() for b in text.split('\n\n') if b.strip()]
         if len(blocks) < 2:
-            self._show_error('No card pairs found.\nExpected: front block, blank line, back block, blank line, repeat.')
             return
         cards_data = []
         for i in range(0, len(blocks) - 1, 2):
@@ -171,23 +189,8 @@ class CreateScreen(Screen):
                     for c in self.app.db.get_cards_for_deck(deck_id)}
         unique = [cd for cd in cards_data
                   if cd['front'].strip().lower() not in existing]
-        if not unique:
-            self._show_error('All cards already exist in this deck.')
-            return
-        self._show_generated(unique, deck_id)
-
-    def _show_error(self, message):
-        from kivy.uix.popup import Popup
-        from kivy.uix.boxlayout import BoxLayout
-        from kivy.uix.label import Label
-        from kivy.uix.button import Button
-        content = BoxLayout(orientation='vertical', padding=10, spacing=8)
-        content.add_widget(Label(text=message))
-        ok_btn = Button(text='OK', size_hint_y=None, height=44)
-        popup = Popup(title='Error', content=content, size_hint=(0.8, 0.4))
-        ok_btn.bind(on_press=popup.dismiss)
-        content.add_widget(ok_btn)
-        popup.open()
+        if unique:
+            self._show_generated(unique, deck_id)
 
     def _show_generated(self, cards_data, deck_id):
         self._gen_rows = []
@@ -196,20 +199,22 @@ class CreateScreen(Screen):
 
         for cd in cards_data:
             row = BoxLayout(size_hint_y=None, height=52, spacing=6)
-            front_e = TextInput(text=cd['front'], multiline=False, size_hint_x=0.45)
-            back_e = TextInput(text=cd['back'], multiline=False, size_hint_x=0.45)
-            del_btn = Button(text='✕', size_hint_x=None, width=44)
-            del_btn.bind(on_press=lambda _, r=row: (
+            front_e = TextInput(text=cd['front'], multiline=False, size_hint_x=0.45,
+                                background_color=SURFACE, foreground_color=TEXT)
+            back_e = TextInput(text=cd['back'], multiline=False, size_hint_x=0.45,
+                               background_color=SURFACE, foreground_color=TEXT)
+            del_b = btn('X', color=DANGER, width=44, height=52)
+            del_b.bind(on_press=lambda _, r=row: (
                 self._gen_layout.remove_widget(r),
-                [self._gen_rows.remove(t) for t in list(self._gen_rows) if t[2] is r],
+                self._gen_rows.remove(r) if r in self._gen_rows else None,
             ))
             row.add_widget(front_e)
             row.add_widget(back_e)
-            row.add_widget(del_btn)
+            row.add_widget(del_b)
             self._gen_layout.add_widget(row)
             self._gen_rows.append((front_e, back_e, row))
 
-        save_all = Button(text='Save All Cards', size_hint_y=None, height=48)
+        save_all = btn('Save All Cards')
         save_all.bind(on_press=lambda _: self._save_generated(deck_id))
         self._gen_layout.add_widget(save_all)
 
