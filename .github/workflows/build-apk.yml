@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-22.04
 
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -51,9 +54,14 @@ jobs:
         working-directory: mobile_version
         run: yes | buildozer android debug 2>&1
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Rename APK
+        run: mv mobile_version/bin/*.apk mobile_version/bin/flashcards.apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: flashcards-apk
-          path: mobile_version/bin/*.apk
-          retention-days: 30
+          tag_name: latest
+          name: Flashcards (latest build)
+          body: Scan the QR code or tap the link below to install on Android.
+          files: mobile_version/bin/flashcards.apk
+          make_latest: true
