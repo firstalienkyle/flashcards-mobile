@@ -9,20 +9,20 @@ source.exclude_dirs = tests,__pycache__,.venv,.pytest_cache
 
 version = 1.0.0
 
-# python3,kivy must come first; sqlite3 is a built-in and must NOT be listed
-requirements = python3,kivy==2.3.0,pillow,requests,certifi,charset-normalizer,idna,urllib3,anthropic,httpx,httpcore,anyio,sniffio,h11,typing_extensions,pydantic,pydantic_core,distro,jiter,annotated_types,openpyxl,et_xmlfile,plyer
+# Only list packages that have p4a recipes or are pure-Python.
+# anthropic SDK is replaced with plain requests (pydantic-core is Rust, can't cross-compile).
+# sqlite3 is a Python built-in — do NOT list it here.
+requirements = python3,kivy==2.3.0,pillow,requests,plyer,openpyxl,et_xmlfile
 
-[buildozer]
-log_level = 2
-warn_on_root = 1
+orientation = portrait
+fullscreen = 0
 
-[app:android]
 android.permissions = INTERNET
 android.api = 33
 android.minapi = 26
 android.ndk = 25b
-android.sdk = 33
 android.archs = arm64-v8a
 
-orientation = portrait
-fullscreen = 0
+[buildozer]
+log_level = 2
+warn_on_root = 1
