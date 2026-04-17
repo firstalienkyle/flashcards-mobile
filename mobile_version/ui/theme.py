@@ -15,13 +15,13 @@ MUTED      = (0.52, 0.53, 0.63, 1)
 BORDER     = (0.22, 0.23, 0.31, 1)
 
 # ── Sizing — tuned for a ~5" portrait phone screen ───────────────────────────
-FONT_TITLE  = '28sp'
-FONT_BODY   = '20sp'
-FONT_SMALL  = '16sp'
-BTN_H       = 76       # tall enough for a thumb tap
-ROW_H       = 64
-PAD         = 14
-GAP         = 10
+FONT_TITLE  = '32sp'
+FONT_BODY   = '22sp'
+FONT_SMALL  = '18sp'
+BTN_H       = 90       # tall enough for a thumb tap
+ROW_H       = 72
+PAD         = 18
+GAP         = 16
 
 
 def apply_bg(widget, color=BG):

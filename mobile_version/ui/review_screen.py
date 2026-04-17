@@ -2,6 +2,7 @@ import threading
 from datetime import datetime
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.graphics import Color, RoundedRectangle
@@ -36,12 +37,11 @@ def _speak(text: str):
 
 
 def _card_panel():
-    """BoxLayout with a rounded surface background."""
     ref = {}
-    panel = BoxLayout(orientation='vertical', padding=24, spacing=10)
+    panel = BoxLayout(orientation='vertical', padding=28, spacing=12)
     with panel.canvas.before:
         ref['c'] = Color(*SURFACE)
-        ref['r'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[16])
+        ref['r'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[18])
     panel.bind(pos=lambda w, _: setattr(ref['r'], 'pos', w.pos))
     panel.bind(size=lambda w, _: setattr(ref['r'], 'size', w.size))
     return panel
@@ -71,7 +71,12 @@ class ReviewScreen(Screen):
         self._complete_root.opacity = 0
         self._complete_root.disabled = True
 
-        wrapper = BoxLayout()
+        # FloatLayout stacks children on top of each other — both fill full screen
+        wrapper = FloatLayout()
+        self._review_root.size_hint = (1, 1)
+        self._review_root.pos_hint = {'x': 0, 'y': 0}
+        self._complete_root.size_hint = (1, 1)
+        self._complete_root.pos_hint = {'x': 0, 'y': 0}
         wrapper.add_widget(self._review_root)
         wrapper.add_widget(self._complete_root)
         self.add_widget(wrapper)
@@ -79,10 +84,10 @@ class ReviewScreen(Screen):
     def _build_review(self):
         root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
-        # ── Compact header ───────────────────────────────────────────────────
-        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
+        # ── Header ───────────────────────────────────────────────────────────
+        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=10)
         home_btn = btn('Home', color=SECONDARY, height=ROW_H)
-        home_btn.size_hint_x = 0.3
+        home_btn.size_hint_x = 0.28
         home_btn.bind(on_press=lambda _: self._end_session(go_home=True))
         header.add_widget(home_btn)
 
@@ -91,30 +96,29 @@ class ReviewScreen(Screen):
         header.add_widget(self._progress_label)
 
         self._speak_btn = btn('Speak', color=SECONDARY, height=ROW_H)
-        self._speak_btn.size_hint_x = 0.3
+        self._speak_btn.size_hint_x = 0.28
         self._speak_btn.bind(on_press=lambda _: self._play_audio())
         header.add_widget(self._speak_btn)
         root.add_widget(header)
 
-        # ── FRONT / BACK badge ───────────────────────────────────────────────
+        # ── Side badge ───────────────────────────────────────────────────────
         self._side_label = lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
-                                height=28, halign='center')
+                                height=32, halign='center')
         root.add_widget(self._side_label)
 
-        # ── Card panel — takes all remaining vertical space ──────────────────
+        # ── Card panel — fills all remaining space ────────────────────────────
         panel = _card_panel()
-
-        self._card_label = lbl('', font_size='24sp', bold=True,
+        self._card_label = lbl('', font_size='26sp', bold=True,
                                 halign='center', valign='middle')
         self._card_label.size_hint_y = 1
         self._card_label.bind(
             size=lambda inst, _: setattr(inst, 'text_size', (inst.width, None))
         )
         panel.add_widget(self._card_label)
-        root.add_widget(panel)  # flex — fills everything between header and nav
+        root.add_widget(panel)
 
         # ── Feedback ─────────────────────────────────────────────────────────
-        self._feedback_label = lbl('', font_size=FONT_BODY, height=44,
+        self._feedback_label = lbl('', font_size=FONT_BODY, height=50,
                                     halign='center', bold=True)
         root.add_widget(self._feedback_label)
 
@@ -131,8 +135,8 @@ class ReviewScreen(Screen):
         self._quiz_input.disabled = True
         root.add_widget(self._quiz_input)
 
-        # ── Nav row — full width, three equal buttons ─────────────────────────
-        nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        # ── Nav — three equal full-width buttons ──────────────────────────────
+        nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=10)
         self._prev_btn = btn('Prev', color=SECONDARY)
         self._prev_btn.bind(on_press=lambda _: self._go_prev())
         nav.add_widget(self._prev_btn)
@@ -152,22 +156,22 @@ class ReviewScreen(Screen):
         root = BoxLayout(orientation='vertical', padding=PAD * 2, spacing=GAP * 2)
         root.add_widget(Widget())
 
-        root.add_widget(lbl('Session Complete', font_size='32sp', bold=True,
-                             halign='center', height=60))
+        root.add_widget(lbl('Session Complete', font_size='36sp', bold=True,
+                             halign='center', height=70))
 
         self._complete_count = lbl('', font_size=FONT_TITLE, halign='center',
-                                    color=MUTED, height=48)
+                                    color=MUTED, height=56)
         root.add_widget(self._complete_count)
 
         self._complete_correct = lbl('', font_size=FONT_BODY, halign='center',
-                                      color=SUCCESS, height=40)
+                                      color=SUCCESS, height=48)
         root.add_widget(self._complete_correct)
 
         self._complete_incorrect = lbl('', font_size=FONT_BODY, halign='center',
-                                        color=DANGER, height=40)
+                                        color=DANGER, height=48)
         root.add_widget(self._complete_incorrect)
 
-        root.add_widget(Widget(size_hint_y=None, height=20))
+        root.add_widget(Widget(size_hint_y=None, height=30))
 
         go_home = btn('Go Home')
         go_home.bind(on_press=lambda _: self.app.show_home())
