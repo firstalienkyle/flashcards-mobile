@@ -6,7 +6,7 @@ from kivy.uix.widget import Widget
 from kivy.uix.progressbar import ProgressBar
 from ui.theme import (
     apply_bg, btn, lbl,
-    BG, SURFACE, PRIMARY, SECONDARY, MUTED, TEXT,
+    SURFACE, SECONDARY, MUTED,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
     BTN_H, ROW_H, PAD, GAP,
 )
@@ -26,36 +26,37 @@ class HomeScreen(Screen):
         header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
         header.add_widget(lbl('Flashcards', font_size=FONT_TITLE, bold=True,
                                height=ROW_H))
-        header.add_widget(Widget())
         settings_btn = btn('Settings', color=SECONDARY, height=ROW_H)
-        settings_btn.size_hint_x = 0.35
+        settings_btn.size_hint_x = 0.38
         settings_btn.bind(on_press=lambda _: self.app.show_settings())
         header.add_widget(settings_btn)
         root.add_widget(header)
 
         # ── Daily goal ──────────────────────────────────────────────────────
-        goal_box = BoxLayout(size_hint_y=None, height=36, spacing=10)
+        goal_box = BoxLayout(size_hint_y=None, height=40, spacing=10)
         self._goal_label = lbl('Loading...', font_size=FONT_SMALL,
-                                color=MUTED, height=36)
+                                color=MUTED, height=40)
         goal_box.add_widget(self._goal_label)
-        self._progress = ProgressBar(max=20, value=0,
-                                      size_hint_x=None, width=140)
+        self._progress = ProgressBar(max=20, value=0, size_hint_x=None, width=120)
         goal_box.add_widget(self._progress)
         root.add_widget(goal_box)
 
-        # ── Action buttons ───────────────────────────────────────────────────
-        actions = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        # ── Action buttons — full width ──────────────────────────────────────
         review_btn = btn('Start Review')
+        review_btn.size_hint_y = None
+        review_btn.height = BTN_H
         review_btn.bind(on_press=lambda _: self.app.show_review())
-        actions.add_widget(review_btn)
+        root.add_widget(review_btn)
+
         new_btn = btn('+ New Card', color=SECONDARY)
+        new_btn.size_hint_y = None
+        new_btn.height = BTN_H
         new_btn.bind(on_press=lambda _: self.app.show_create())
-        actions.add_widget(new_btn)
-        root.add_widget(actions)
+        root.add_widget(new_btn)
 
         # ── Deck list ────────────────────────────────────────────────────────
         root.add_widget(lbl('Your Decks', font_size=FONT_SMALL, color=MUTED,
-                             height=28))
+                             height=32))
 
         scroll = ScrollView()
         self._grid = GridLayout(cols=1, spacing=8, size_hint_y=None, padding=0)
@@ -80,7 +81,7 @@ class HomeScreen(Screen):
         if not decks:
             self._grid.add_widget(
                 lbl('No decks yet — tap "+ New Card" to get started',
-                    color=MUTED, height=60, halign='center')
+                    color=MUTED, height=70, halign='center')
             )
             return
 
@@ -90,7 +91,7 @@ class HomeScreen(Screen):
                 f'{deck.name}   |   {stats["card_count"]} cards   '
                 f'|   Memory {stats["avg_memory"]:.0f}%',
                 color=SURFACE,
-                height=58,
+                height=BTN_H,
             )
             tile.halign = 'left'
             tile.bind(size=lambda b, _: setattr(b, 'text_size', (b.width - 16, None)))

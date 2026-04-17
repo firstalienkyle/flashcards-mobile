@@ -27,10 +27,11 @@ class CreateScreen(Screen):
 
     def _build(self):
         apply_bg(self)
-        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
+        outer = BoxLayout(orientation='vertical')
 
-        # ── Header ──────────────────────────────────────────────────────────
-        header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
+        # ── Fixed header ─────────────────────────────────────────────────────
+        header = BoxLayout(size_hint_y=None, height=ROW_H,
+                           padding=[PAD, 0], spacing=8)
         back = btn('Back', color=SECONDARY, height=ROW_H)
         back.size_hint_x = 0.25
         back.bind(on_press=lambda _: self.app.show_home())
@@ -38,72 +39,80 @@ class CreateScreen(Screen):
         header.add_widget(lbl('New Card', font_size=FONT_TITLE, bold=True,
                                height=ROW_H))
         header.add_widget(Widget())
-        root.add_widget(header)
+        outer.add_widget(header)
 
-        # ── Deck row ─────────────────────────────────────────────────────────
+        # ── Single scrollable body (everything below the header) ─────────────
+        scroll = ScrollView(do_scroll_x=False)
+        body = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP,
+                         size_hint_y=None)
+        body.bind(minimum_height=body.setter('height'))
+
+        # Deck row
         deck_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
-        deck_row.add_widget(lbl('Deck:', height=BTN_H, size_hint_x=None, width=55))
+        deck_row.add_widget(lbl('Deck:', height=BTN_H, size_hint_x=None, width=60))
         self._deck_spinner = Spinner(
             text='Select deck', values=[],
             size_hint_x=1, size_hint_y=None, height=BTN_H,
             background_normal='', background_color=SURFACE,
-            color=TEXT,
+            color=TEXT, font_size=FONT_BODY,
         )
         deck_row.add_widget(self._deck_spinner)
         new_deck = btn('+ New', color=SECONDARY, height=BTN_H)
-        new_deck.size_hint_x = 0.25
+        new_deck.size_hint_x = 0.28
         new_deck.bind(on_press=self._new_deck_dialog)
         deck_row.add_widget(new_deck)
-        root.add_widget(deck_row)
+        body.add_widget(deck_row)
 
-        # ── Manual entry ─────────────────────────────────────────────────────
-        root.add_widget(lbl('Front:', height=26, color=MUTED))
+        # Front / Back inputs
+        body.add_widget(lbl('Front:', height=30, color=MUTED, font_size=FONT_SMALL))
         self._front_input = TextInput(
-            multiline=True, size_hint_y=None, height=80,
+            multiline=True, size_hint_y=None, height=90,
             background_color=SURFACE, foreground_color=TEXT,
+            font_size=FONT_BODY,
         )
-        root.add_widget(self._front_input)
+        body.add_widget(self._front_input)
 
-        root.add_widget(lbl('Back:', height=26, color=MUTED))
+        body.add_widget(lbl('Back:', height=30, color=MUTED, font_size=FONT_SMALL))
         self._back_input = TextInput(
-            multiline=True, size_hint_y=None, height=80,
+            multiline=True, size_hint_y=None, height=90,
             background_color=SURFACE, foreground_color=TEXT,
+            font_size=FONT_BODY,
         )
-        root.add_widget(self._back_input)
+        body.add_widget(self._back_input)
 
         save = btn('Save Card')
         save.bind(on_press=self._save_card)
-        root.add_widget(save)
+        body.add_widget(save)
 
-        # ── Import from file ──────────────────────────────────────────────────
-        root.add_widget(lbl('-- or import from file --', font_size=FONT_SMALL,
-                             color=MUTED, height=28, halign='center'))
+        # Import divider
+        body.add_widget(lbl('-- or import from file --', font_size=FONT_SMALL,
+                             color=MUTED, height=34, halign='center'))
 
         import_btn = btn('Choose TXT File', color=SECONDARY)
         import_btn.bind(on_press=self._pick_file)
-        root.add_widget(import_btn)
+        body.add_widget(import_btn)
 
-        root.add_widget(lbl(
-            'Format: front text, blank line, back text, blank line, repeat',
-            font_size=FONT_SMALL, color=MUTED, height=26,
+        body.add_widget(lbl(
+            'Format: front, blank line, back, blank line, repeat',
+            font_size=FONT_SMALL, color=MUTED, height=34,
         ))
 
-        self._import_status = lbl('', font_size=FONT_SMALL, color=MUTED, height=26)
-        root.add_widget(self._import_status)
+        self._import_status = lbl('', font_size=FONT_SMALL, color=MUTED, height=34)
+        body.add_widget(self._import_status)
 
-        # ── Preview of imported cards ─────────────────────────────────────────
+        # Imported cards preview (grows dynamically)
         self._gen_label = lbl('Review imported cards before saving',
-                               bold=True, height=32)
+                               bold=True, height=36)
         self._gen_label.opacity = 0
-        root.add_widget(self._gen_label)
+        body.add_widget(self._gen_label)
 
-        scroll = ScrollView()
         self._gen_layout = GridLayout(cols=1, spacing=8, size_hint_y=None, padding=0)
         self._gen_layout.bind(minimum_height=self._gen_layout.setter('height'))
-        scroll.add_widget(self._gen_layout)
-        root.add_widget(scroll)
+        body.add_widget(self._gen_layout)
 
-        self.add_widget(root)
+        scroll.add_widget(body)
+        outer.add_widget(scroll)
+        self.add_widget(outer)
 
     # ── Deck helpers ──────────────────────────────────────────────────────────
 

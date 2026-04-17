@@ -2,7 +2,6 @@ import threading
 from datetime import datetime
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.graphics import Color, RoundedRectangle
@@ -12,7 +11,7 @@ from services.review_scheduler import (
 import data.database as db
 from ui.theme import (
     apply_bg, btn, lbl,
-    BG, SURFACE, PRIMARY, SECONDARY, SUCCESS, DANGER, MUTED, TEXT,
+    SURFACE, SECONDARY, SUCCESS, DANGER, MUTED, TEXT,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
     BTN_H, ROW_H, PAD, GAP,
 )
@@ -36,14 +35,15 @@ def _speak(text: str):
     threading.Thread(target=_run, daemon=True).start()
 
 
-def _card_panel(ref):
-    """Return a BoxLayout that draws a rounded-rect surface background."""
-    panel = BoxLayout(orientation='vertical', padding=20, spacing=10)
+def _card_panel():
+    """BoxLayout with a rounded surface background."""
+    ref = {}
+    panel = BoxLayout(orientation='vertical', padding=24, spacing=10)
     with panel.canvas.before:
-        ref['color'] = Color(*SURFACE)
-        ref['rect'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[12])
-    panel.bind(pos=lambda w, _: setattr(ref['rect'], 'pos', w.pos))
-    panel.bind(size=lambda w, _: setattr(ref['rect'], 'size', w.size))
+        ref['c'] = Color(*SURFACE)
+        ref['r'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[16])
+    panel.bind(pos=lambda w, _: setattr(ref['r'], 'pos', w.pos))
+    panel.bind(size=lambda w, _: setattr(ref['r'], 'size', w.size))
     return panel
 
 
@@ -66,8 +66,6 @@ class ReviewScreen(Screen):
 
     def _build(self):
         apply_bg(self)
-
-        # We keep both views as children; only one is visible at a time
         self._review_root = self._build_review()
         self._complete_root = self._build_complete()
         self._complete_root.opacity = 0
@@ -81,50 +79,49 @@ class ReviewScreen(Screen):
     def _build_review(self):
         root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
-        # Header
+        # ── Compact header ───────────────────────────────────────────────────
         header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
         home_btn = btn('Home', color=SECONDARY, height=ROW_H)
-        home_btn.size_hint_x = 0.25
+        home_btn.size_hint_x = 0.3
         home_btn.bind(on_press=lambda _: self._end_session(go_home=True))
         header.add_widget(home_btn)
-        header.add_widget(Widget())
+
         self._progress_label = lbl('', font_size=FONT_SMALL, color=MUTED,
-                                    height=ROW_H, halign='right')
+                                    height=ROW_H, halign='center')
         header.add_widget(self._progress_label)
+
+        self._speak_btn = btn('Speak', color=SECONDARY, height=ROW_H)
+        self._speak_btn.size_hint_x = 0.3
+        self._speak_btn.bind(on_press=lambda _: self._play_audio())
+        header.add_widget(self._speak_btn)
         root.add_widget(header)
 
-        # FRONT / BACK badge
+        # ── FRONT / BACK badge ───────────────────────────────────────────────
         self._side_label = lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
-                                height=24, halign='center')
+                                height=28, halign='center')
         root.add_widget(self._side_label)
 
-        # Card panel — centred text inside a surface box
-        card_ref = {}
-        panel = _card_panel(card_ref)
+        # ── Card panel — takes all remaining vertical space ──────────────────
+        panel = _card_panel()
 
-        anchor = AnchorLayout(anchor_x='center', anchor_y='center')
-        self._card_label = lbl('', font_size='22sp', bold=True,
+        self._card_label = lbl('', font_size='24sp', bold=True,
                                 halign='center', valign='middle')
+        self._card_label.size_hint_y = 1
         self._card_label.bind(
             size=lambda inst, _: setattr(inst, 'text_size', (inst.width, None))
         )
-        anchor.add_widget(self._card_label)
-        panel.add_widget(anchor)
-        root.add_widget(panel)  # takes remaining vertical space
+        panel.add_widget(self._card_label)
+        root.add_widget(panel)  # flex — fills everything between header and nav
 
-        # Speak
-        speak_row = BoxLayout(size_hint_y=None, height=BTN_H)
-        self._speak_btn = btn('Speak', color=SECONDARY, height=BTN_H)
-        self._speak_btn.size_hint_x = 0.4
-        self._speak_btn.bind(on_press=lambda _: self._play_audio())
-        speak_row.add_widget(self._speak_btn)
-        speak_row.add_widget(Widget())
-        root.add_widget(speak_row)
+        # ── Feedback ─────────────────────────────────────────────────────────
+        self._feedback_label = lbl('', font_size=FONT_BODY, height=44,
+                                    halign='center', bold=True)
+        root.add_widget(self._feedback_label)
 
-        # Quiz input
+        # ── Quiz input ────────────────────────────────────────────────────────
         self._quiz_input = TextInput(
             hint_text='Type your answer...',
-            size_hint_y=None, height=50,
+            size_hint_y=None, height=BTN_H,
             multiline=False,
             background_color=SURFACE,
             foreground_color=TEXT,
@@ -134,15 +131,9 @@ class ReviewScreen(Screen):
         self._quiz_input.disabled = True
         root.add_widget(self._quiz_input)
 
-        # Feedback
-        self._feedback_label = lbl('', font_size='17sp', height=38, halign='center')
-        root.add_widget(self._feedback_label)
-
-
-        # Nav
+        # ── Nav row — full width, three equal buttons ─────────────────────────
         nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
         self._prev_btn = btn('Prev', color=SECONDARY)
-        self._prev_btn.size_hint_x = 0.25
         self._prev_btn.bind(on_press=lambda _: self._go_prev())
         nav.add_widget(self._prev_btn)
 
@@ -151,7 +142,6 @@ class ReviewScreen(Screen):
         nav.add_widget(self._action_btn)
 
         self._next_btn = btn('Next', color=SECONDARY)
-        self._next_btn.size_hint_x = 0.25
         self._next_btn.bind(on_press=lambda _: self._go_next())
         nav.add_widget(self._next_btn)
         root.add_widget(nav)
@@ -160,24 +150,24 @@ class ReviewScreen(Screen):
 
     def _build_complete(self):
         root = BoxLayout(orientation='vertical', padding=PAD * 2, spacing=GAP * 2)
-        root.add_widget(Widget())  # push content to centre
+        root.add_widget(Widget())
 
-        root.add_widget(lbl('Session Complete', font_size='28sp', bold=True,
-                             halign='center', height=50))
+        root.add_widget(lbl('Session Complete', font_size='32sp', bold=True,
+                             halign='center', height=60))
 
         self._complete_count = lbl('', font_size=FONT_TITLE, halign='center',
-                                    color=MUTED, height=40)
+                                    color=MUTED, height=48)
         root.add_widget(self._complete_count)
 
         self._complete_correct = lbl('', font_size=FONT_BODY, halign='center',
-                                      color=SUCCESS, height=34)
+                                      color=SUCCESS, height=40)
         root.add_widget(self._complete_correct)
 
         self._complete_incorrect = lbl('', font_size=FONT_BODY, halign='center',
-                                        color=DANGER, height=34)
+                                        color=DANGER, height=40)
         root.add_widget(self._complete_incorrect)
 
-        root.add_widget(Widget(size_hint_y=None, height=30))
+        root.add_widget(Widget(size_hint_y=None, height=20))
 
         go_home = btn('Go Home')
         go_home.bind(on_press=lambda _: self.app.show_home())
@@ -187,7 +177,7 @@ class ReviewScreen(Screen):
         review_again.bind(on_press=lambda _: self._restart())
         root.add_widget(review_again)
 
-        root.add_widget(Widget())  # push content to centre
+        root.add_widget(Widget())
         return root
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -203,7 +193,6 @@ class ReviewScreen(Screen):
         self._seen = set()
         self._correct = 0
         self._incorrect = 0
-
         self._show_review_view()
 
         if not self._queue:
@@ -252,8 +241,6 @@ class ReviewScreen(Screen):
         self._action_btn.text = 'Flip'
         self._action_btn.disabled = False
         self._progress_label.text = f'{self._index + 1} / {len(self._queue)}'
-        self._speak_btn.opacity = 1
-        self._speak_btn.disabled = False
 
     def _on_action(self):
         if self._action_btn.text == 'Flip':

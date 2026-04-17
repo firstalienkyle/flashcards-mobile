@@ -9,7 +9,7 @@ from data.models import Card
 from ui.theme import (
     apply_bg, btn, lbl,
     SURFACE, SECONDARY, DANGER, MUTED, TEXT,
-    FONT_BODY, FONT_TITLE,
+    FONT_TITLE, FONT_BODY, FONT_SMALL,
     BTN_H, ROW_H, PAD, GAP,
 )
 
@@ -28,12 +28,11 @@ class DeckScreen(Screen):
         # ── Header ──────────────────────────────────────────────────────────
         header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
         back = btn('Back', color=SECONDARY, height=ROW_H)
-        back.size_hint_x = 0.25
+        back.size_hint_x = 0.28
         back.bind(on_press=lambda _: self.app.show_home())
         header.add_widget(back)
         self._title = lbl('Deck', font_size=FONT_TITLE, bold=True, height=ROW_H)
         header.add_widget(self._title)
-        header.add_widget(Widget())
         add = btn('+ Card', height=ROW_H)
         add.size_hint_x = 0.28
         add.bind(on_press=lambda _: self.app.show_create(self._deck_id))
@@ -43,17 +42,18 @@ class DeckScreen(Screen):
         # ── Search ───────────────────────────────────────────────────────────
         self._search = TextInput(
             hint_text='Search cards...',
-            size_hint_y=None, height=40,
+            size_hint_y=None, height=BTN_H,
             multiline=False,
             foreground_color=TEXT,
             background_color=SURFACE,
+            font_size=FONT_BODY,
         )
         self._search.bind(text=self._on_search)
         root.add_widget(self._search)
 
         # ── Card list ─────────────────────────────────────────────────────────
         scroll = ScrollView()
-        self._card_list = GridLayout(cols=1, spacing=6, size_hint_y=None, padding=0)
+        self._card_list = GridLayout(cols=1, spacing=8, size_hint_y=None, padding=0)
         self._card_list.bind(minimum_height=self._card_list.setter('height'))
         scroll.add_widget(self._card_list)
         root.add_widget(scroll)
@@ -76,11 +76,12 @@ class DeckScreen(Screen):
 
         self._card_list.clear_widgets()
         for card in cards:
-            row = BoxLayout(size_hint_y=None, height=58, spacing=6)
+            # Card row: text takes most space, Edit and Del are fixed proportion
+            row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=6)
 
             card_btn = btn(
-                f'{card.front[:50]}  ->  {card.back[:50]}',
-                color=SURFACE, height=58,
+                f'{card.front[:40]}  ->  {card.back[:40]}',
+                color=SURFACE, height=BTN_H,
             )
             card_btn.halign = 'left'
             card_btn.bind(size=lambda b, _: setattr(b, 'text_size', (b.width - 12, None)))
@@ -108,15 +109,17 @@ class DeckScreen(Screen):
     def _edit_dialog(self, card):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         front_input = TextInput(text=card.front, multiline=True,
-                                size_hint_y=None, height=80)
+                                size_hint_y=None, height=90,
+                                font_size=FONT_BODY)
         back_input = TextInput(text=card.back, multiline=True,
-                               size_hint_y=None, height=80)
-        content.add_widget(lbl('Front:', height=26))
+                               size_hint_y=None, height=90,
+                               font_size=FONT_BODY)
+        content.add_widget(lbl('Front:', height=30))
         content.add_widget(front_input)
-        content.add_widget(lbl('Back:', height=26))
+        content.add_widget(lbl('Back:', height=30))
         content.add_widget(back_input)
 
-        popup = Popup(title='Edit Card', content=content, size_hint=(0.9, 0.65))
+        popup = Popup(title='Edit Card', content=content, size_hint=(0.95, 0.75))
 
         def _save(_):
             card.front = front_input.text.strip()
@@ -126,7 +129,7 @@ class DeckScreen(Screen):
                 popup.dismiss()
                 self._load(filter_text=self._search.text)
 
-        btn_row = BoxLayout(size_hint_y=None, height=48, spacing=8)
+        btn_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
         save = btn('Save')
         save.bind(on_press=_save)
         cancel = btn('Cancel', color=SECONDARY)
