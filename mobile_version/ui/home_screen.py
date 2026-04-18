@@ -55,8 +55,9 @@ class HomeScreen(Screen):
         root.add_widget(new_btn)
 
         # ── Deck list ────────────────────────────────────────────────────────
+        root.add_widget(Widget(size_hint_y=None, height=GAP * 2))
         root.add_widget(lbl('Your Decks', font_size=FONT_SMALL, color=MUTED,
-                             height=32))
+                             height=40))
 
         scroll = ScrollView()
         self._grid = GridLayout(cols=1, spacing=8, size_hint_y=None, padding=0)

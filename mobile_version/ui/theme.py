@@ -18,8 +18,8 @@ BORDER     = (0.22, 0.23, 0.31, 1)
 FONT_TITLE  = '32sp'
 FONT_BODY   = '22sp'
 FONT_SMALL  = '18sp'
-BTN_H       = 90       # tall enough for a thumb tap
-ROW_H       = 72
+BTN_H       = 120      # tall enough for a thumb tap
+ROW_H       = 88
 PAD         = 18
 GAP         = 16
 
