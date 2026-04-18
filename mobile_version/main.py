@@ -4,10 +4,12 @@ import os
 _app_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _app_dir)
 
-# Only set a desktop preview window size — on Android Kivy uses the real screen
+# Set phone-sized preview window on desktop — must happen before any kivy import
 if not os.environ.get('ANDROID_ARGUMENT'):
-    os.environ.setdefault('KIVY_WINDOW_WIDTH', '400')
-    os.environ.setdefault('KIVY_WINDOW_HEIGHT', '760')
+    from kivy.config import Config
+    Config.set('graphics', 'width',  '393')   # Samsung Galaxy A34 aspect ratio
+    Config.set('graphics', 'height', '876')   # 1080x2408 scaled down
+    Config.set('graphics', 'resizable', '0')
 
 import data.database as db
 import services.review_scheduler as review_scheduler

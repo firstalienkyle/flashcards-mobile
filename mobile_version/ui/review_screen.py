@@ -2,7 +2,6 @@ import threading
 from datetime import datetime
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
 from kivy.graphics import Color, RoundedRectangle
@@ -58,6 +57,7 @@ class ReviewScreen(Screen):
         self._incorrect = 0
         self._session_id = None
         self._showing_front = True
+        self._wrapper = None
         self._review_root = None
         self._complete_root = None
         self._build()
@@ -66,20 +66,13 @@ class ReviewScreen(Screen):
 
     def _build(self):
         apply_bg(self)
+        # Single BoxLayout wrapper — we swap one child at a time
+        self._wrapper = BoxLayout(orientation='vertical')
         self._review_root = self._build_review()
         self._complete_root = self._build_complete()
-        self._complete_root.opacity = 0
-        self._complete_root.disabled = True
-
-        # FloatLayout stacks children on top of each other — both fill full screen
-        wrapper = FloatLayout()
-        self._review_root.size_hint = (1, 1)
-        self._review_root.pos_hint = {'x': 0, 'y': 0}
-        self._complete_root.size_hint = (1, 1)
-        self._complete_root.pos_hint = {'x': 0, 'y': 0}
-        wrapper.add_widget(self._review_root)
-        wrapper.add_widget(self._complete_root)
-        self.add_widget(wrapper)
+        # Start with review view loaded
+        self._wrapper.add_widget(self._review_root)
+        self.add_widget(self._wrapper)
 
     def _build_review(self):
         root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
@@ -190,6 +183,9 @@ class ReviewScreen(Screen):
         self._start_session()
 
     def _start_session(self):
+        # Ensure review view is showing
+        self._show_review_view()
+
         decay_rate = float(self.app.db.get_setting('decay_rate') or 5)
         all_cards = db.get_all_cards()
         self._queue = build_review_queue(all_cards, decay_rate)
@@ -197,7 +193,6 @@ class ReviewScreen(Screen):
         self._seen = set()
         self._correct = 0
         self._incorrect = 0
-        self._show_review_view()
 
         if not self._queue:
             self._card_label.text = 'No cards to review yet.\nAdd some cards first!'
@@ -214,22 +209,24 @@ class ReviewScreen(Screen):
         self._start_session()
 
     # ── View switching ────────────────────────────────────────────────────────
+    # Swap children in the wrapper — only one is ever in the tree at a time,
+    # so there is no invisible widget blocking touches.
 
     def _show_review_view(self):
-        self._review_root.opacity = 1
-        self._review_root.disabled = False
-        self._complete_root.opacity = 0
-        self._complete_root.disabled = True
+        if self._complete_root.parent is self._wrapper:
+            self._wrapper.remove_widget(self._complete_root)
+        if self._review_root.parent is not self._wrapper:
+            self._wrapper.add_widget(self._review_root)
 
     def _show_complete_view(self):
         reviewed = len(self._seen)
         self._complete_count.text = f'{reviewed} card{"s" if reviewed != 1 else ""} reviewed'
         self._complete_correct.text = f'Correct: {self._correct}'
         self._complete_incorrect.text = f'Incorrect: {self._incorrect}'
-        self._review_root.opacity = 0
-        self._review_root.disabled = True
-        self._complete_root.opacity = 1
-        self._complete_root.disabled = False
+        if self._review_root.parent is self._wrapper:
+            self._wrapper.remove_widget(self._review_root)
+        if self._complete_root.parent is not self._wrapper:
+            self._wrapper.add_widget(self._complete_root)
 
     # ── Card display ──────────────────────────────────────────────────────────
 
@@ -309,6 +306,8 @@ class ReviewScreen(Screen):
             self._show_card()
 
     def _play_audio(self):
+        if not self._queue:
+            return
         card = self._queue[self._index]
         text = card.front if self._showing_front else card.back
         _speak(text)

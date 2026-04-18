@@ -36,47 +36,67 @@ class CreateScreen(Screen):
         back.size_hint_x = 0.25
         back.bind(on_press=lambda _: self.app.show_home())
         header.add_widget(back)
-        header.add_widget(lbl('New Card', font_size=FONT_TITLE, bold=True,
-                               height=ROW_H))
-        header.add_widget(Widget())
+        title = lbl('New Card', font_size=FONT_TITLE, bold=True,
+                    height=ROW_H, halign='center')
+        header.add_widget(title)
+        header.add_widget(Widget(size_hint_x=0.25))  # mirror back btn for centering
         outer.add_widget(header)
 
-        # ── Single scrollable body (everything below the header) ─────────────
+        # ── Single scrollable body ────────────────────────────────────────────
         scroll = ScrollView(do_scroll_x=False)
-        body = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP,
+        body = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP * 2,
                          size_hint_y=None)
         body.bind(minimum_height=body.setter('height'))
 
         # Deck row
         deck_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
-        deck_row.add_widget(lbl('Deck:', height=BTN_H, size_hint_x=None, width=60))
+        deck_lbl = lbl('Deck:', height=BTN_H, size_hint_x=0.22,
+                       font_size=FONT_BODY, halign='left')
+        deck_lbl.size_hint_y = None
+        deck_lbl.height = BTN_H
+        deck_row.add_widget(deck_lbl)
         self._deck_spinner = Spinner(
-            text='Select deck', values=[],
-            size_hint_x=1, size_hint_y=None, height=BTN_H,
+            text='Select', values=[],
+            size_hint_x=0.42, size_hint_y=None, height=BTN_H,
             background_normal='', background_color=SURFACE,
-            color=TEXT, font_size=FONT_BODY,
+            color=TEXT, font_size=FONT_SMALL,
         )
         deck_row.add_widget(self._deck_spinner)
         new_deck = btn('+ New', color=SECONDARY, height=BTN_H)
-        new_deck.size_hint_x = 0.28
+        new_deck.size_hint_x = 0.24
         new_deck.bind(on_press=self._new_deck_dialog)
         deck_row.add_widget(new_deck)
+        del_deck = btn('Del', color=DANGER, height=BTN_H)
+        del_deck.size_hint_x = 0.20
+        del_deck.bind(on_press=self._delete_deck_dialog)
+        deck_row.add_widget(del_deck)
         body.add_widget(deck_row)
 
-        # Front / Back inputs
-        body.add_widget(lbl('Front:', height=30, color=MUTED, font_size=FONT_SMALL))
+        # Front input — auto-expanding
+        body.add_widget(lbl('Front:', height=36, color=MUTED,
+                             font_size=FONT_SMALL))
         self._front_input = TextInput(
-            multiline=True, size_hint_y=None, height=90,
+            multiline=True, size_hint_y=None,
             background_color=SURFACE, foreground_color=TEXT,
             font_size=FONT_BODY,
         )
+        self._front_input.height = BTN_H
+        self._front_input.bind(
+            minimum_height=lambda inst, h: setattr(inst, 'height', max(h, BTN_H))
+        )
         body.add_widget(self._front_input)
 
-        body.add_widget(lbl('Back:', height=30, color=MUTED, font_size=FONT_SMALL))
+        # Back input — auto-expanding
+        body.add_widget(lbl('Back:', height=36, color=MUTED,
+                             font_size=FONT_SMALL))
         self._back_input = TextInput(
-            multiline=True, size_hint_y=None, height=90,
+            multiline=True, size_hint_y=None,
             background_color=SURFACE, foreground_color=TEXT,
             font_size=FONT_BODY,
+        )
+        self._back_input.height = BTN_H
+        self._back_input.bind(
+            minimum_height=lambda inst, h: setattr(inst, 'height', max(h, BTN_H))
         )
         body.add_widget(self._back_input)
 
@@ -84,25 +104,30 @@ class CreateScreen(Screen):
         save.bind(on_press=self._save_card)
         body.add_widget(save)
 
-        # Import divider
+        # Extra spacer before import section
+        body.add_widget(Widget(size_hint_y=None, height=GAP * 3))
+
         body.add_widget(lbl('-- or import from file --', font_size=FONT_SMALL,
-                             color=MUTED, height=34, halign='center'))
+                             color=MUTED, height=40, halign='center'))
+
+        # Extra spacer before Choose TXT button
+        body.add_widget(Widget(size_hint_y=None, height=GAP * 2))
 
         import_btn = btn('Choose TXT File', color=SECONDARY)
         import_btn.bind(on_press=self._pick_file)
         body.add_widget(import_btn)
 
+        # Extra spacer before format hint
+        body.add_widget(Widget(size_hint_y=None, height=GAP * 2))
+
         body.add_widget(lbl(
             'Format: front, blank line, back, blank line, repeat',
-            font_size=FONT_SMALL, color=MUTED, height=34,
+            font_size=FONT_SMALL, color=MUTED, height=40,
         ))
-
-        self._import_status = lbl('', font_size=FONT_SMALL, color=MUTED, height=34)
-        body.add_widget(self._import_status)
 
         # Imported cards preview (grows dynamically)
         self._gen_label = lbl('Review imported cards before saving',
-                               bold=True, height=36)
+                               bold=True, height=44)
         self._gen_label.opacity = 0
         body.add_widget(self._gen_label)
 
@@ -112,6 +137,13 @@ class CreateScreen(Screen):
 
         scroll.add_widget(body)
         outer.add_widget(scroll)
+
+        # ── Status label pinned to bottom ─────────────────────────────────────
+        self._import_status = lbl('', font_size=FONT_SMALL, color=DANGER,
+                                   height=50, halign='center',
+                                   size_hint_y=None)
+        outer.add_widget(self._import_status)
+
         self.add_widget(outer)
 
     # ── Deck helpers ──────────────────────────────────────────────────────────
@@ -139,7 +171,7 @@ class CreateScreen(Screen):
         name_input = TextInput(hint_text='Deck name', multiline=False,
                                size_hint_y=None, height=BTN_H)
         content.add_widget(name_input)
-        popup = Popup(title='New Deck', content=content, size_hint=(0.85, 0.35))
+        popup = Popup(title='New Deck', content=content, size_hint=(0.85, 0.38))
 
         def _create(_):
             name = name_input.text.strip()
@@ -160,6 +192,37 @@ class CreateScreen(Screen):
         content.add_widget(btn_row)
         popup.open()
 
+    def _delete_deck_dialog(self, _):
+        deck_id = self._get_selected_deck_id()
+        if deck_id is None:
+            self._import_status.text = 'Select a deck to delete.'
+            self._import_status.color = DANGER
+            return
+        deck_name = self._deck_spinner.text
+        content = BoxLayout(orientation='vertical', padding=12, spacing=8)
+        content.add_widget(lbl(
+            f'Delete "{deck_name}" and all its cards?\nThis cannot be undone.',
+            font_size=FONT_SMALL, color=DANGER, height=80, halign='center',
+        ))
+        popup = Popup(title='Delete Deck', content=content, size_hint=(0.85, 0.40))
+
+        def _confirm(_):
+            self.app.db.delete_deck(deck_id)
+            popup.dismiss()
+            self._load_decks()
+            self._import_status.text = f'Deck "{deck_name}" deleted.'
+            self._import_status.color = MUTED
+
+        btn_row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=8)
+        confirm = btn('Delete', color=DANGER)
+        confirm.bind(on_press=_confirm)
+        cancel = btn('Cancel', color=SECONDARY)
+        cancel.bind(on_press=popup.dismiss)
+        btn_row.add_widget(confirm)
+        btn_row.add_widget(cancel)
+        content.add_widget(btn_row)
+        popup.open()
+
     # ── Manual save ───────────────────────────────────────────────────────────
 
     def _save_card(self, _):
@@ -167,10 +230,14 @@ class CreateScreen(Screen):
         back = self._back_input.text.strip()
         deck_id = self._get_selected_deck_id()
         if not front or not back or deck_id is None:
+            self._import_status.text = 'Fill in front, back, and select a deck.'
+            self._import_status.color = DANGER
             return
         self.app.db.create_card(Card(front=front, back=back, deck_id=deck_id))
         self._front_input.text = ''
         self._back_input.text = ''
+        self._import_status.text = 'Card saved!'
+        self._import_status.color = SUCCESS
 
     # ── File picker ───────────────────────────────────────────────────────────
 
@@ -181,7 +248,6 @@ class CreateScreen(Screen):
             self._import_status.color = DANGER
             return
 
-        # Try plyer (works on Android); fall back to path input on desktop
         try:
             from plyer import filechooser
             filechooser.open_file(
@@ -190,13 +256,12 @@ class CreateScreen(Screen):
                 title='Choose a TXT file',
             )
         except Exception:
-            # Desktop preview: plyer has no native picker, use manual path input
             self._show_path_input_popup()
 
     def _show_path_input_popup(self):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         content.add_widget(lbl('Enter full path to your .txt file:',
-                                height=28, color=MUTED))
+                                height=32, color=MUTED))
         path_input = TextInput(
             hint_text='/path/to/file.txt',
             multiline=False,
@@ -204,7 +269,7 @@ class CreateScreen(Screen):
             background_color=SURFACE, foreground_color=TEXT,
         )
         content.add_widget(path_input)
-        popup = Popup(title='Import TXT', content=content, size_hint=(0.9, 0.38))
+        popup = Popup(title='Import TXT', content=content, size_hint=(0.9, 0.42))
 
         def _load(_):
             popup.dismiss()
@@ -223,7 +288,6 @@ class CreateScreen(Screen):
         popup.open()
 
     def _on_file_selected(self, selection):
-        # plyer calls this on a background thread — schedule back on main thread
         Clock.schedule_once(lambda dt: self._load_file(selection))
 
     def _load_file(self, selection):
@@ -277,7 +341,6 @@ class CreateScreen(Screen):
         self._gen_label.opacity = 1
 
         for cd in cards_data:
-            # Each card is a vertical stacked panel (front on top, back below)
             card_box = BoxLayout(orientation='vertical',
                                  size_hint_y=None, height=120, spacing=4)
 

@@ -75,27 +75,41 @@ class DeckScreen(Screen):
             cards = [c for c in cards if q in c.front.lower() or q in c.back.lower()]
 
         self._card_list.clear_widgets()
+        BTN_HALF = (BTN_H - 4) // 2  # two buttons + 4px spacing fit exactly in BTN_H
         for card in cards:
-            # Card row: text takes most space, Edit and Del are fixed proportion
             row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=6)
 
-            card_btn = btn(
-                f'{card.front[:40]}  ->  {card.back[:40]}',
-                color=SURFACE, height=BTN_H,
+            # Left: wrapping front -> back text
+            text_lbl = lbl(
+                f'{card.front}  ->  {card.back}',
+                font_size=FONT_SMALL, color=TEXT,
+                halign='left',
             )
-            card_btn.halign = 'left'
-            card_btn.bind(size=lambda b, _: setattr(b, 'text_size', (b.width - 12, None)))
-            row.add_widget(card_btn)
+            # size_hint_y=None lets us control height; start at BTN_H
+            text_lbl.size_hint_y = None
+            text_lbl.height = BTN_H
 
-            edit = btn('Edit', color=SECONDARY, height=BTN_H)
-            edit.size_hint_x = 0.2
+            def _on_width(inst, width, r=row, l=text_lbl):
+                l.text_size = (width, None)
+                l.texture_update()
+                new_h = max(int(l.texture_size[1]) + 24, BTN_H)
+                if r.height != new_h:
+                    r.height = new_h
+                    l.height = new_h
+
+            text_lbl.bind(width=_on_width)
+            row.add_widget(text_lbl)
+
+            # Right: Edit + Del stacked, heights sum exactly to row height
+            actions = BoxLayout(orientation='vertical',
+                                size_hint_x=None, width=90, spacing=4)
+            edit = btn('Edit', color=SECONDARY, height=BTN_HALF)
             edit.bind(on_press=lambda _, c=card: self._edit_dialog(c))
-            row.add_widget(edit)
-
-            delete = btn('Del', color=DANGER, height=BTN_H)
-            delete.size_hint_x = 0.18
+            delete = btn('Del', color=DANGER, height=BTN_HALF)
             delete.bind(on_press=lambda _, cid=card.id: self._delete_card(cid))
-            row.add_widget(delete)
+            actions.add_widget(edit)
+            actions.add_widget(delete)
+            row.add_widget(actions)
 
             self._card_list.add_widget(row)
 
