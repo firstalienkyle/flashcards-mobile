@@ -8,6 +8,7 @@ from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.graphics import Color, Rectangle
+
 import data.database as db
 from ui.theme import (
     apply_bg, btn, lbl,
@@ -21,7 +22,7 @@ class HomeScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
-        self._viewer = None   # full-screen image overlay
+        self._viewer = None
         self._build()
 
     def _build(self):
@@ -105,49 +106,32 @@ class HomeScreen(Screen):
         return fl
 
     def _open_viewer(self, path, label_text):
-        """Show a full-screen overlay with the image and a close button."""
+        """Show a full-screen modal with the image and a close button."""
+        from kivy.uix.modalview import ModalView
         from pathlib import Path
-        overlay = FloatLayout()
-        with overlay.canvas.before:
-            Color(*BG)
-            bg_rect = Rectangle(pos=overlay.pos, size=overlay.size)
-        overlay.bind(pos=lambda w, _: setattr(bg_rect, 'pos', w.pos))
-        overlay.bind(size=lambda w, _: setattr(bg_rect, 'size', w.size))
+
+        mv = ModalView(size_hint=(1, 1), auto_dismiss=True,
+                       background='', background_color=BG)
+
+        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
         if Path(path).exists():
             img = Image(source=path, allow_stretch=True, keep_ratio=True,
-                        size_hint=(1, 0.88), pos_hint={'x': 0, 'top': 1})
+                        size_hint=(1, 1))
         else:
-            img = lbl('[image not found]', color=MUTED, halign='center',
-                      size_hint=(1, 0.88), pos_hint={'x': 0, 'top': 1})
+            img = lbl('[image not found]', color=MUTED, halign='center')
 
         caption = Label(text=label_text, font_size=FONT_BODY, color=TEXT,
-                        size_hint=(1, None), height=50,
-                        pos_hint={'x': 0, 'y': 0.08},
-                        halign='center')
+                        size_hint_y=None, height=50, halign='center')
         caption.bind(size=lambda inst, _: setattr(inst, 'text_size', (inst.width, None)))
 
         close = Button(text='Close', font_size=FONT_BODY, bold=True,
                        background_normal='', background_color=SECONDARY,
-                       color=TEXT,
-                       size_hint=(0.4, None), height=BTN_H,
-                       pos_hint={'center_x': 0.5, 'y': 0})
-        close.bind(on_press=lambda _: self._close_viewer(overlay))
+                       color=TEXT, size_hint_y=None, height=BTN_H)
+        close.bind(on_press=lambda _: mv.dismiss())
 
-        overlay.add_widget(img)
-        overlay.add_widget(caption)
-        overlay.add_widget(close)
-
-        self._viewer = overlay
-        self.add_widget(overlay)
-
-    def _close_viewer(self, overlay):
-        self.remove_widget(overlay)
-        self._viewer = None
-
-    def on_touch_down(self, touch):
-        # Allow back swipe when viewer is open
-        if self._viewer and not self._viewer.collide_point(*touch.pos):
-            self._close_viewer(self._viewer)
-            return True
-        return super().on_touch_down(touch)
+        root.add_widget(img)
+        root.add_widget(caption)
+        root.add_widget(close)
+        mv.add_widget(root)
+        mv.open()
