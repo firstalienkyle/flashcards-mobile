@@ -96,15 +96,36 @@ class SettingsScreen(Screen):
             self._list_box.add_widget(row)
 
     def _import_picture(self, _):
-        try:
-            from plyer import filechooser
-            filechooser.open_file(
-                on_selection=self._on_file_selected,
-                filters=['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.webp'],
-                title='Choose a picture',
-            )
-        except Exception:
-            self._show_path_popup()
+        import os
+        if os.environ.get('ANDROID_ARGUMENT'):
+            try:
+                from plyer import filechooser
+                filechooser.open_file(
+                    on_selection=self._on_file_selected,
+                    filters=['image/*'],
+                    title='Choose a picture',
+                )
+            except Exception:
+                self._show_path_popup()
+        else:
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                path = filedialog.askopenfilename(
+                    title='Choose a picture',
+                    filetypes=[
+                        ('Images', '*.jpg *.jpeg *.png *.gif *.bmp *.webp'),
+                        ('All files', '*.*'),
+                    ],
+                )
+                root.destroy()
+                if path:
+                    Clock.schedule_once(lambda dt: self._ask_label(path))
+            except Exception:
+                self._show_path_popup()
 
     def _show_path_popup(self):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
