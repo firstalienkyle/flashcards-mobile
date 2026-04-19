@@ -3,6 +3,7 @@ import threading
 
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.widget import Widget
@@ -10,13 +11,16 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
+from kivy.graphics import Color, RoundedRectangle, Rectangle
 from data.models import Card
 from ui.theme import (
     apply_bg, btn, lbl,
-    SURFACE, SECONDARY, DANGER, MUTED, TEXT,
+    BG, SURFACE, SECONDARY, DANGER, MUTED, TEXT, PRIMARY,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
     BTN_H, ROW_H, PAD, GAP, SPK_W, CJK_FONT,
 )
+
+LINE_H = 52   # matches review_screen
 
 _VOICE_MAP = {'es': 'Monica', 'en': 'Samantha', 'zh': 'Ting-Ting'}
 
@@ -156,73 +160,101 @@ class DeckScreen(Screen):
             self._card_list.add_widget(row)
 
     def _preview_card(self, card):
-        LINE_H = 52
-        content = BoxLayout(orientation='vertical', padding=12, spacing=10)
+        """Full-screen overlay that mirrors the review session layout exactly."""
+        showing_front = [True]   # mutable cell so inner functions can toggle it
 
-        # Front section
-        content.add_widget(lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
-                                height=30, halign='center'))
-        scroll_front = ScrollView(do_scroll_x=False, size_hint_y=None, height=180)
-        front_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=4)
-        front_box.bind(minimum_height=front_box.setter('height'))
-        for line in card.front.splitlines():
-            if not line.strip():
-                continue
-            row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
-            ll = Label(text=line, halign='left', valign='middle',
-                       size_hint_x=1, size_hint_y=None, height=LINE_H,
-                       font_size=FONT_SMALL, font_name=CJK_FONT, color=TEXT)
-            ll.bind(width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None)))
-            ll.bind(texture_size=lambda inst, ts, r=row: (
-                setattr(inst, 'height', max(int(ts[1]) + 10, LINE_H)),
-                setattr(r, 'height', max(int(ts[1]) + 10, LINE_H)),
-            ))
-            spk = Button(text='Spk', size_hint=(None, None), width=SPK_W, height=LINE_H,
-                         font_size=FONT_SMALL, background_normal='',
-                         background_color=SECONDARY, color=TEXT)
-            row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
-            spk.bind(on_press=lambda _, t=line: _speak(t, 'es'))
-            row.add_widget(ll)
-            row.add_widget(spk)
-            front_box.add_widget(row)
-        scroll_front.add_widget(front_box)
-        content.add_widget(scroll_front)
+        # ── Outer overlay (full screen, dark BG) ──────────────────────────────
+        overlay = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
+        with overlay.canvas.before:
+            Color(*BG)
+            bg_rect = Rectangle(pos=overlay.pos, size=overlay.size)
+        overlay.bind(pos=lambda w, _: setattr(bg_rect, 'pos', w.pos))
+        overlay.bind(size=lambda w, _: setattr(bg_rect, 'size', w.size))
 
-        # Back section
-        content.add_widget(lbl('BACK', font_size=FONT_SMALL, color=MUTED,
-                                height=30, halign='center'))
-        scroll_back = ScrollView(do_scroll_x=False, size_hint_y=None, height=180)
-        back_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=4)
-        back_box.bind(minimum_height=back_box.setter('height'))
-        for line in card.back.splitlines():
-            if not line.strip():
-                continue
-            row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
-            ll = Label(text=line, halign='left', valign='middle',
-                       size_hint_x=1, size_hint_y=None, height=LINE_H,
-                       font_size=FONT_SMALL, font_name=CJK_FONT, color=TEXT)
-            ll.bind(width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None)))
-            ll.bind(texture_size=lambda inst, ts, r=row: (
-                setattr(inst, 'height', max(int(ts[1]) + 10, LINE_H)),
-                setattr(r, 'height', max(int(ts[1]) + 10, LINE_H)),
-            ))
-            spk = Button(text='Spk', size_hint=(None, None), width=SPK_W, height=LINE_H,
-                         font_size=FONT_SMALL, background_normal='',
-                         background_color=SECONDARY, color=TEXT)
-            row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
-            spk.bind(on_press=lambda _, t=line: _speak(t, 'en'))
-            row.add_widget(ll)
-            row.add_widget(spk)
-            back_box.add_widget(row)
-        scroll_back.add_widget(back_box)
-        content.add_widget(scroll_back)
+        # ── Side badge ────────────────────────────────────────────────────────
+        side_lbl = lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
+                        height=32, halign='center')
+        overlay.add_widget(side_lbl)
 
-        popup = Popup(title='Card Preview', content=content,
-                      size_hint=(0.95, 0.85))
-        close = btn('Close', color=SECONDARY, height=BTN_H)
-        close.bind(on_press=popup.dismiss)
-        content.add_widget(close)
-        popup.open()
+        # ── Card panel (identical RoundedRectangle style) ─────────────────────
+        ref = {}
+        panel = BoxLayout(orientation='vertical', padding=16, spacing=8)
+        with panel.canvas.before:
+            ref['c'] = Color(*SURFACE)
+            ref['r'] = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[18])
+        panel.bind(pos=lambda w, _: setattr(ref['r'], 'pos', w.pos))
+        panel.bind(size=lambda w, _: setattr(ref['r'], 'size', w.size))
+
+        card_scroll = ScrollView(do_scroll_x=False)
+        card_content = BoxLayout(orientation='vertical', size_hint_y=None,
+                                  spacing=6, padding=[0, 4])
+        card_content.bind(minimum_height=card_content.setter('height'))
+        card_scroll.add_widget(card_content)
+        panel.add_widget(card_scroll)
+        overlay.add_widget(panel)
+
+        # ── Nav row: Flip | Close ─────────────────────────────────────────────
+        nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=10)
+        flip_btn = btn('Flip')
+        close_btn = btn('Close', color=SECONDARY)
+        nav.add_widget(flip_btn)
+        nav.add_widget(close_btn)
+        overlay.add_widget(nav)
+
+        # ── Helper: build per-line rows (same as review_screen) ───────────────
+        def _build_lines(text, lang):
+            card_content.clear_widgets()
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
+                line_lbl = Label(
+                    text=line,
+                    halign='left', valign='middle',
+                    size_hint_x=1, size_hint_y=None, height=LINE_H,
+                    font_size=FONT_BODY, font_name=CJK_FONT, color=TEXT,
+                )
+                line_lbl.bind(
+                    width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None))
+                )
+                def _on_tex(inst, ts, r=row):
+                    new_h = max(int(ts[1]) + 12, LINE_H)
+                    inst.height = new_h
+                    r.height = new_h
+                line_lbl.bind(texture_size=_on_tex)
+
+                spk = Button(
+                    text='Spk', size_hint=(None, None),
+                    width=SPK_W, height=LINE_H,
+                    font_size=FONT_SMALL, background_normal='',
+                    background_color=SECONDARY, color=TEXT,
+                )
+                row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
+                spk.bind(on_press=lambda _, t=line, l=lang: _speak(t, l))
+                row.add_widget(line_lbl)
+                row.add_widget(spk)
+                card_content.add_widget(row)
+
+        # ── Flip logic ────────────────────────────────────────────────────────
+        def _flip(_):
+            showing_front[0] = not showing_front[0]
+            if showing_front[0]:
+                side_lbl.text = 'FRONT'
+                _build_lines(card.front, 'es')
+            else:
+                side_lbl.text = 'BACK'
+                _build_lines(card.back, 'en')
+
+        flip_btn.bind(on_press=_flip)
+
+        # ── Initial state: show front ─────────────────────────────────────────
+        _build_lines(card.front, 'es')
+
+        # ── Mount overlay on this screen ──────────────────────────────────────
+        overlay.size_hint = (1, 1)
+        overlay.pos_hint = {'x': 0, 'y': 0}
+        close_btn.bind(on_press=lambda _: self.remove_widget(overlay))
+        self.add_widget(overlay)
 
     def _on_search(self, instance, value):
         self._load(filter_text=value)
