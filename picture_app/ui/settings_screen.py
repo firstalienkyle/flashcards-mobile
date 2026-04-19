@@ -111,19 +111,17 @@ class SettingsScreen(Screen):
             import threading
             def _pick():
                 try:
-                    import tkinter as tk
-                    from tkinter import filedialog
-                    root = tk.Tk()
-                    root.withdraw()
-                    root.attributes('-topmost', True)
-                    path = filedialog.askopenfilename(
-                        title='Choose a picture',
-                        filetypes=[
-                            ('Images', '*.jpg *.jpeg *.png *.gif *.bmp *.webp'),
-                            ('All files', '*.*'),
-                        ],
+                    import subprocess
+                    script = (
+                        'POSIX path of (choose file '
+                        'with prompt "Choose a picture" '
+                        'of type {"public.image", "jpg", "jpeg", "png", "gif", "bmp", "webp"})'
                     )
-                    root.destroy()
+                    result = subprocess.run(
+                        ['osascript', '-e', script],
+                        capture_output=True, text=True,
+                    )
+                    path = result.stdout.strip()
                     if path:
                         Clock.schedule_once(lambda dt: self._ask_label(path))
                 except Exception:
