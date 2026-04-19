@@ -108,24 +108,27 @@ class SettingsScreen(Screen):
             except Exception:
                 self._show_path_popup()
         else:
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                path = filedialog.askopenfilename(
-                    title='Choose a picture',
-                    filetypes=[
-                        ('Images', '*.jpg *.jpeg *.png *.gif *.bmp *.webp'),
-                        ('All files', '*.*'),
-                    ],
-                )
-                root.destroy()
-                if path:
-                    Clock.schedule_once(lambda dt: self._ask_label(path))
-            except Exception:
-                self._show_path_popup()
+            import threading
+            def _pick():
+                try:
+                    import tkinter as tk
+                    from tkinter import filedialog
+                    root = tk.Tk()
+                    root.withdraw()
+                    root.attributes('-topmost', True)
+                    path = filedialog.askopenfilename(
+                        title='Choose a picture',
+                        filetypes=[
+                            ('Images', '*.jpg *.jpeg *.png *.gif *.bmp *.webp'),
+                            ('All files', '*.*'),
+                        ],
+                    )
+                    root.destroy()
+                    if path:
+                        Clock.schedule_once(lambda dt: self._ask_label(path))
+                except Exception:
+                    Clock.schedule_once(lambda dt: self._show_path_popup())
+            threading.Thread(target=_pick, daemon=True).start()
 
     def _show_path_popup(self):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
