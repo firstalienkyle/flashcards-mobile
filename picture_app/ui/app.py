@@ -3,28 +3,24 @@ from kivy.core.window import Window
 from kivy.uix.screenmanager import ScreenManager
 
 
-class FlashcardsApp(App):
-    title = 'Flashcards'
+class PictureApp(App):
+    title = 'Pictures'
 
-    def __init__(self, db, review_scheduler_mod, sync_client, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.db = db
-        self.rs = review_scheduler_mod
-        self.sync = sync_client
         self.sm = None
 
     def build(self):
-        # Android back button (key 27 = ESC) and hardware back → go home
         Window.bind(on_keyboard=self._on_keyboard)
         self.sm = ScreenManager()
         self.show_home()
         return self.sm
 
     def _on_keyboard(self, window, key, *largs):
-        if key == 27:  # ESC / Android back button
+        if key == 27:  # Android back button
             if self.sm and self.sm.current != 'home':
                 self.show_home()
-                return True   # event consumed — prevents default (exit app)
+                return True
         return False
 
     def _switch(self, screen):
@@ -37,18 +33,6 @@ class FlashcardsApp(App):
     def show_home(self):
         from ui.home_screen import HomeScreen
         self._switch(HomeScreen(self, name='home'))
-
-    def show_deck(self, deck_id):
-        from ui.deck_screen import DeckScreen
-        self._switch(DeckScreen(self, deck_id=deck_id, name='deck'))
-
-    def show_create(self, deck_id=None):
-        from ui.create_screen import CreateScreen
-        self._switch(CreateScreen(self, deck_id=deck_id, name='create'))
-
-    def show_review(self):
-        from ui.review_screen import ReviewScreen
-        self._switch(ReviewScreen(self, name='review'))
 
     def show_settings(self):
         from ui.settings_screen import SettingsScreen

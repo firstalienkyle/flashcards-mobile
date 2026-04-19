@@ -1,17 +1,44 @@
+import os
+import threading
+
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
+from kivy.uix.label import Label
+from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from data.models import Card
 from ui.theme import (
     apply_bg, btn, lbl,
     SURFACE, SECONDARY, DANGER, MUTED, TEXT,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
-    BTN_H, ROW_H, PAD, GAP,
+    BTN_H, ROW_H, PAD, GAP, SPK_W, CJK_FONT,
 )
+
+_VOICE_MAP = {'es': 'Monica', 'en': 'Samantha', 'zh': 'Ting-Ting'}
+
+def _speak(text: str, lang: str = 'en'):
+    word = text.strip().splitlines()[0] if text.strip() else ''
+    if not word:
+        return
+    def _run():
+        if os.environ.get('ANDROID_ARGUMENT'):
+            try:
+                from plyer import tts
+                tts.speak(word)
+            except Exception:
+                pass
+        else:
+            import subprocess
+            voice = _VOICE_MAP.get(lang, 'Samantha')
+            try:
+                subprocess.Popen(['say', '-v', voice, word])
+            except Exception:
+                pass
+    threading.Thread(target=_run, daemon=True).start()
 
 
 class DeckScreen(Screen):
@@ -98,7 +125,22 @@ class DeckScreen(Screen):
                     l.height = new_h
 
             text_lbl.bind(width=_on_width)
-            row.add_widget(text_lbl)
+            # Tap the text to preview the full card
+            from kivy.uix.button import Button as _Btn
+            preview_tap = _Btn(
+                text='',
+                size_hint=(1, 1),
+                background_normal='',
+                background_color=(0, 0, 0, 0),  # fully transparent overlay
+            )
+            preview_tap.bind(on_press=lambda _, c=card: self._preview_card(c))
+            # Float the transparent tap target over the label
+            from kivy.uix.floatlayout import FloatLayout
+            text_fl = FloatLayout()
+            text_lbl.size_hint = (1, 1)
+            text_fl.add_widget(text_lbl)
+            text_fl.add_widget(preview_tap)
+            row.add_widget(text_fl)
 
             # Right: Edit + Del stacked, heights sum exactly to row height
             actions = BoxLayout(orientation='vertical',
@@ -112,6 +154,75 @@ class DeckScreen(Screen):
             row.add_widget(actions)
 
             self._card_list.add_widget(row)
+
+    def _preview_card(self, card):
+        LINE_H = 52
+        content = BoxLayout(orientation='vertical', padding=12, spacing=10)
+
+        # Front section
+        content.add_widget(lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
+                                height=30, halign='center'))
+        scroll_front = ScrollView(do_scroll_x=False, size_hint_y=None, height=180)
+        front_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=4)
+        front_box.bind(minimum_height=front_box.setter('height'))
+        for line in card.front.splitlines():
+            if not line.strip():
+                continue
+            row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
+            ll = Label(text=line, halign='left', valign='middle',
+                       size_hint_x=1, size_hint_y=None, height=LINE_H,
+                       font_size=FONT_SMALL, font_name=CJK_FONT, color=TEXT)
+            ll.bind(width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None)))
+            ll.bind(texture_size=lambda inst, ts, r=row: (
+                setattr(inst, 'height', max(int(ts[1]) + 10, LINE_H)),
+                setattr(r, 'height', max(int(ts[1]) + 10, LINE_H)),
+            ))
+            spk = Button(text='Spk', size_hint=(None, None), width=SPK_W, height=LINE_H,
+                         font_size=FONT_SMALL, background_normal='',
+                         background_color=SECONDARY, color=TEXT)
+            row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
+            spk.bind(on_press=lambda _, t=line: _speak(t, 'es'))
+            row.add_widget(ll)
+            row.add_widget(spk)
+            front_box.add_widget(row)
+        scroll_front.add_widget(front_box)
+        content.add_widget(scroll_front)
+
+        # Back section
+        content.add_widget(lbl('BACK', font_size=FONT_SMALL, color=MUTED,
+                                height=30, halign='center'))
+        scroll_back = ScrollView(do_scroll_x=False, size_hint_y=None, height=180)
+        back_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=4)
+        back_box.bind(minimum_height=back_box.setter('height'))
+        for line in card.back.splitlines():
+            if not line.strip():
+                continue
+            row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
+            ll = Label(text=line, halign='left', valign='middle',
+                       size_hint_x=1, size_hint_y=None, height=LINE_H,
+                       font_size=FONT_SMALL, font_name=CJK_FONT, color=TEXT)
+            ll.bind(width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None)))
+            ll.bind(texture_size=lambda inst, ts, r=row: (
+                setattr(inst, 'height', max(int(ts[1]) + 10, LINE_H)),
+                setattr(r, 'height', max(int(ts[1]) + 10, LINE_H)),
+            ))
+            spk = Button(text='Spk', size_hint=(None, None), width=SPK_W, height=LINE_H,
+                         font_size=FONT_SMALL, background_normal='',
+                         background_color=SECONDARY, color=TEXT)
+            row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
+            spk.bind(on_press=lambda _, t=line: _speak(t, 'en'))
+            row.add_widget(ll)
+            row.add_widget(spk)
+            back_box.add_widget(row)
+        scroll_back.add_widget(back_box)
+        content.add_widget(scroll_back)
+
+        popup = Popup(title='Card Preview', content=content,
+                      size_hint=(0.95, 0.85))
+        close = btn('Close', color=SECONDARY, height=BTN_H)
+        close.bind(on_press=popup.dismiss)
+        content.add_widget(close)
+        popup.open()
 
     def _on_search(self, instance, value):
         self._load(filter_text=value)

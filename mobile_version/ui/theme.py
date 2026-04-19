@@ -1,9 +1,29 @@
 """Shared visual theme for all screens."""
+import os
 from kivy.graphics import Color, Rectangle
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 
-# ── Palette ──────────────────────────────────────────────────────────────────
+# ── CJK font registration ─────────────────────────────────────────────────────
+# Try known system font locations; fall back to Roboto if none found.
+CJK_FONT = 'Roboto'
+_CJK_CANDIDATES = [
+    '/System/Library/Fonts/PingFang.ttc',        # macOS
+    '/System/Library/Fonts/STHeiti Light.ttc',   # macOS alt
+    '/system/fonts/NotoSansCJK-Regular.ttc',     # Android
+    '/system/fonts/DroidSansFallback.ttf',        # Android old
+]
+for _p in _CJK_CANDIDATES:
+    if os.path.exists(_p):
+        try:
+            from kivy.core.text import LabelBase
+            LabelBase.register(name='CJKFont', fn_regular=_p)
+            CJK_FONT = 'CJKFont'
+        except Exception:
+            pass
+        break
+
+# ── Palette ───────────────────────────────────────────────────────────────────
 BG         = (0.08, 0.09, 0.12, 1)
 SURFACE    = (0.13, 0.14, 0.19, 1)
 PRIMARY    = (0.22, 0.53, 0.96, 1)
@@ -14,7 +34,7 @@ TEXT       = (0.93, 0.93, 0.97, 1)
 MUTED      = (0.52, 0.53, 0.63, 1)
 BORDER     = (0.22, 0.23, 0.31, 1)
 
-# ── Sizing — tuned for a ~5" portrait phone screen ───────────────────────────
+# ── Sizing — tuned for a ~5" portrait phone screen ────────────────────────────
 FONT_TITLE  = '32sp'
 FONT_BODY   = '22sp'
 FONT_SMALL  = '18sp'
@@ -22,6 +42,7 @@ BTN_H       = 120      # tall enough for a thumb tap
 ROW_H       = 88
 PAD         = 18
 GAP         = 16
+SPK_W       = 72       # width of per-line speak button
 
 
 def apply_bg(widget, color=BG):
@@ -60,6 +81,7 @@ def lbl(text, font_size=FONT_BODY, color=TEXT, bold=False,
         color=color,
         bold=bold,
         halign=halign,
+        font_name=CJK_FONT,
         **kw,
     )
     if height is not None:
