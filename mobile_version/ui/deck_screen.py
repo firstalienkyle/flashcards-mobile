@@ -22,7 +22,11 @@ from ui.theme import (
 
 LINE_H = 52   # matches review_screen
 
-_VOICE_MAP = {'es': 'Monica', 'en': 'Samantha', 'zh': 'Ting-Ting'}
+_VOICE_MAP = {'en': 'Samantha', 'zh': 'Ting-Ting'}
+_CJK_RANGE = range(0x4E00, 0xA000)
+
+def _detect_lang(text: str) -> str:
+    return 'zh' if any(ord(c) in _CJK_RANGE for c in text) else 'en'
 
 def _speak(text: str, lang: str = 'en'):
     word = text.strip().splitlines()[0] if text.strip() else ''
@@ -203,7 +207,7 @@ class DeckScreen(Screen):
         mv.add_widget(root)
 
         # ── Helper: build per-line rows ───────────────────────────────────────
-        def _build_lines(text, lang):
+        def _build_lines(text):
             card_content.clear_widgets()
             for line in text.splitlines():
                 if not line.strip():
@@ -231,7 +235,7 @@ class DeckScreen(Screen):
                     background_color=SECONDARY, color=TEXT,
                 )
                 row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
-                spk.bind(on_press=lambda _, t=line, l=lang: _speak(t, l))
+                spk.bind(on_press=lambda _, t=line: _speak(t, _detect_lang(t)))
                 row.add_widget(line_lbl)
                 row.add_widget(spk)
                 card_content.add_widget(row)
@@ -241,15 +245,15 @@ class DeckScreen(Screen):
             showing_front[0] = not showing_front[0]
             if showing_front[0]:
                 side_lbl.text = 'FRONT'
-                _build_lines(card.front, 'es')
+                _build_lines(card.front)
             else:
                 side_lbl.text = 'BACK'
-                _build_lines(card.back, 'en')
+                _build_lines(card.back)
 
         flip_btn.bind(on_press=_flip)
         close_btn.bind(on_press=lambda _: mv.dismiss())
 
-        _build_lines(card.front, 'es')
+        _build_lines(card.front)
         mv.open()
 
     def _on_search(self, instance, value):

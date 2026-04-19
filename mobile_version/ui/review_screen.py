@@ -24,7 +24,12 @@ from ui.theme import (
 )
 
 # ── Speech ────────────────────────────────────────────────────────────────────
-_VOICE_MAP = {'es': 'Monica', 'en': 'Samantha', 'zh': 'Ting-Ting'}
+_VOICE_MAP = {'en': 'Samantha', 'zh': 'Ting-Ting'}
+_CJK_RANGE = range(0x4E00, 0xA000)  # CJK Unified Ideographs block
+
+def _detect_lang(text: str) -> str:
+    """Return 'zh' if text contains CJK characters, else 'en'."""
+    return 'zh' if any(ord(c) in _CJK_RANGE for c in text) else 'en'
 
 def _first_line(text: str) -> str:
     for line in text.splitlines():
@@ -237,7 +242,7 @@ class ReviewScreen(Screen):
 
         if not self._queue:
             self._rebuild_card_lines(
-                ['No cards to review yet.', 'Add some cards first!'], lang='en'
+                ['No cards to review yet.', 'Add some cards first!']
             )
             self._action_btn.disabled = True
             self._mem_label.text = ''
@@ -272,7 +277,7 @@ class ReviewScreen(Screen):
 
     # ── Card content ──────────────────────────────────────────────────────────
 
-    def _rebuild_card_lines(self, lines, lang='en'):
+    def _rebuild_card_lines(self, lines):
         """Replace card content with left-aligned per-line rows + speak buttons."""
         self._card_content.clear_widgets()
         for line in lines:
@@ -317,8 +322,7 @@ class ReviewScreen(Screen):
             row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
 
             captured_line = line
-            captured_lang = lang
-            spk.bind(on_press=lambda _, t=captured_line, l=captured_lang: _speak(t, l))
+            spk.bind(on_press=lambda _, t=captured_line: _speak(t, _detect_lang(t)))
 
             row.add_widget(line_lbl)
             row.add_widget(spk)
@@ -340,7 +344,7 @@ class ReviewScreen(Screen):
         self._update_mem_display(card)
 
         lines = [l for l in card.front.splitlines() if l.strip()]
-        self._rebuild_card_lines(lines, lang='es')
+        self._rebuild_card_lines(lines)
 
         # Determine mode
         if card.is_quiz and card.id not in self._seen:
@@ -378,7 +382,7 @@ class ReviewScreen(Screen):
             self._showing_front = False
             self._side_label.text = 'BACK'
             lines = [l for l in card.back.splitlines() if l.strip()]
-            self._rebuild_card_lines(lines, lang='en')
+            self._rebuild_card_lines(lines)
             # Record 'seen' on first reveal of back
             if card.id not in self._seen:
                 already_seen = False
@@ -391,7 +395,7 @@ class ReviewScreen(Screen):
             self._showing_front = True
             self._side_label.text = 'FRONT'
             lines = [l for l in card.front.splitlines() if l.strip()]
-            self._rebuild_card_lines(lines, lang='es')
+            self._rebuild_card_lines(lines)
             self._action_btn.text = 'Flip'
 
     def _submit_quiz(self):
