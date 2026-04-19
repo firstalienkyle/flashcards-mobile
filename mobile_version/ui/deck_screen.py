@@ -20,7 +20,10 @@ from ui.theme import (
     BTN_H, ROW_H, PAD, GAP, SPK_W, CJK_FONT,
 )
 
-LINE_H = 52   # matches review_screen
+from kivy.metrics import sp
+from kivy.core.window import Window
+
+LINE_H = sp(52)
 
 _VOICE_MAP = {'en': 'Samantha', 'zh': 'Ting-Ting'}
 _CJK_RANGE = range(0x4E00, 0xA000)
@@ -110,47 +113,40 @@ class DeckScreen(Screen):
             cards = [c for c in cards if q in c.front.lower() or q in c.back.lower()]
 
         self._card_list.clear_widgets()
-        BTN_HALF = (BTN_H - 4) // 2  # two buttons + 4px spacing fit exactly in BTN_H
+        BTN_HALF = (BTN_H - 4) // 2
+
+        # Pre-compute available text width so row heights are stable from the start,
+        # preventing GridLayout from overlapping rows when heights change post-layout.
+        text_w = max(Window.width - 2 * PAD - 90 - 6, 100)
+
         for card in cards:
-            row = BoxLayout(size_hint_y=None, height=BTN_H, spacing=6)
+            label_text = f'{card.front}  ->  {card.back}'
 
-            # Left: wrapping front -> back text
-            text_lbl = lbl(
-                f'{card.front}  ->  {card.back}',
-                font_size=FONT_SMALL, color=TEXT,
-                halign='left',
-            )
-            # size_hint_y=None lets us control height; start at BTN_H
+            # Measure wrapped height before creating the row
+            text_lbl = lbl(label_text, font_size=FONT_SMALL, color=TEXT,
+                           halign='left')
             text_lbl.size_hint_y = None
-            text_lbl.height = BTN_H
+            text_lbl.text_size = (text_w, None)
+            text_lbl.texture_update()
+            row_h = max(int(text_lbl.texture_size[1]) + 20, BTN_H)
+            text_lbl.height = row_h
 
-            def _on_width(inst, width, r=row, l=text_lbl):
-                l.text_size = (width, None)
-                l.texture_update()
-                new_h = max(int(l.texture_size[1]) + 24, BTN_H)
-                if r.height != new_h:
-                    r.height = new_h
-                    l.height = new_h
+            row = BoxLayout(size_hint_y=None, height=row_h, spacing=6)
 
-            text_lbl.bind(width=_on_width)
-            # Tap the text to preview the full card
-            from kivy.uix.button import Button as _Btn
-            preview_tap = _Btn(
-                text='',
-                size_hint=(1, 1),
-                background_normal='',
-                background_color=(0, 0, 0, 0),  # fully transparent overlay
+            # Transparent tap overlay so tapping the text opens the preview
+            preview_tap = Button(
+                text='', size_hint=(1, 1),
+                background_normal='', background_color=(0, 0, 0, 0),
             )
             preview_tap.bind(on_press=lambda _, c=card: self._preview_card(c))
-            # Float the transparent tap target over the label
-            from kivy.uix.floatlayout import FloatLayout
-            text_fl = FloatLayout()
+
+            text_fl = FloatLayout(size_hint_x=1, size_hint_y=None, height=row_h)
             text_lbl.size_hint = (1, 1)
             text_fl.add_widget(text_lbl)
             text_fl.add_widget(preview_tap)
             row.add_widget(text_fl)
 
-            # Right: Edit + Del stacked, heights sum exactly to row height
+            # Right: Edit + Del stacked
             actions = BoxLayout(orientation='vertical',
                                 size_hint_x=None, width=90, spacing=4)
             edit = btn('Edit', color=SECONDARY, height=BTN_HALF)
@@ -267,10 +263,10 @@ class DeckScreen(Screen):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         front_input = TextInput(text=card.front, multiline=True,
                                 size_hint_y=None, height=90,
-                                font_size=FONT_BODY)
+                                font_size=FONT_BODY, font_name=CJK_FONT)
         back_input = TextInput(text=card.back, multiline=True,
                                size_hint_y=None, height=90,
-                               font_size=FONT_BODY)
+                               font_size=FONT_BODY, font_name=CJK_FONT)
         content.add_widget(lbl('Front:', height=30))
         content.add_widget(front_input)
         content.add_widget(lbl('Back:', height=30))

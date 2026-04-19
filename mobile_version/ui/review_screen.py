@@ -72,7 +72,8 @@ def _card_panel():
 
 
 # ── Line height constant (scales with FONT_BODY ≈ 22sp) ──────────────────────
-LINE_H = 52   # minimum height per line row
+from kivy.metrics import sp
+LINE_H = sp(52)   # minimum height per line row, scales with font size
 
 
 class ReviewScreen(Screen):
@@ -154,6 +155,7 @@ class ReviewScreen(Screen):
             background_color=SURFACE,
             foreground_color=TEXT,
             font_size=FONT_BODY,
+            font_name=CJK_FONT,
         )
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True

@@ -3,6 +3,7 @@ import os
 from kivy.graphics import Color, Rectangle
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.metrics import sp, dp
 
 # ── CJK font registration ─────────────────────────────────────────────────────
 # Try known system font locations; fall back to Roboto if none found.
@@ -34,15 +35,15 @@ TEXT       = (0.93, 0.93, 0.97, 1)
 MUTED      = (0.52, 0.53, 0.63, 1)
 BORDER     = (0.22, 0.23, 0.31, 1)
 
-# ── Sizing — tuned for a ~5" portrait phone screen ────────────────────────────
+# ── Sizing — scales with system font size (sp) or screen density (dp) ─────────
 FONT_TITLE  = '32sp'
 FONT_BODY   = '22sp'
 FONT_SMALL  = '18sp'
-BTN_H       = 120      # tall enough for a thumb tap
-ROW_H       = 88
-PAD         = 18
-GAP         = 16
-SPK_W       = 72       # width of per-line speak button
+BTN_H       = sp(120)  # scales with phone accessibility font size
+ROW_H       = sp(88)
+PAD         = dp(18)
+GAP         = dp(16)
+SPK_W       = sp(72)   # width of per-line speak button
 
 
 def apply_bg(widget, color=BG):
@@ -59,6 +60,7 @@ def btn(text, color=PRIMARY, width=None, height=None, **kw):
     b = Button(
         text=text,
         font_size=FONT_BODY,
+        font_name=CJK_FONT,
         bold=True,
         background_normal='',
         background_color=color,

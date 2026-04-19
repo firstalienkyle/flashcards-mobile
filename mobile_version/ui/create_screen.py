@@ -12,7 +12,7 @@ from ui.theme import (
     apply_bg, btn, lbl,
     SURFACE, SECONDARY, DANGER, SUCCESS, MUTED, TEXT,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
-    BTN_H, ROW_H, PAD, GAP,
+    BTN_H, ROW_H, PAD, GAP, CJK_FONT,
 )
 
 
@@ -78,7 +78,7 @@ class CreateScreen(Screen):
         self._front_input = TextInput(
             multiline=True, size_hint_y=None,
             background_color=SURFACE, foreground_color=TEXT,
-            font_size=FONT_BODY,
+            font_size=FONT_BODY, font_name=CJK_FONT,
         )
         self._front_input.height = BTN_H
         self._front_input.bind(
@@ -92,7 +92,7 @@ class CreateScreen(Screen):
         self._back_input = TextInput(
             multiline=True, size_hint_y=None,
             background_color=SURFACE, foreground_color=TEXT,
-            font_size=FONT_BODY,
+            font_size=FONT_BODY, font_name=CJK_FONT,
         )
         self._back_input.height = BTN_H
         self._back_input.bind(
@@ -169,7 +169,8 @@ class CreateScreen(Screen):
     def _new_deck_dialog(self, _):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         name_input = TextInput(hint_text='Deck name', multiline=False,
-                               size_hint_y=None, height=BTN_H)
+                               size_hint_y=None, height=BTN_H,
+                               font_name=CJK_FONT)
         content.add_widget(name_input)
         popup = Popup(title='New Deck', content=content, size_hint=(0.85, 0.38))
 
@@ -267,6 +268,7 @@ class CreateScreen(Screen):
             multiline=False,
             size_hint_y=None, height=BTN_H,
             background_color=SURFACE, foreground_color=TEXT,
+            font_name=CJK_FONT,
         )
         content.add_widget(path_input)
         popup = Popup(title='Import TXT', content=content, size_hint=(0.9, 0.42))
@@ -349,7 +351,7 @@ class CreateScreen(Screen):
                 text=cd['front'], multiline=False,
                 size_hint_x=1, size_hint_y=None, height=52,
                 background_color=SURFACE, foreground_color=TEXT,
-                hint_text='Front',
+                hint_text='Front', font_name=CJK_FONT,
             )
             del_b = btn('X', color=DANGER, height=52)
             del_b.size_hint_x = 0.15
@@ -361,7 +363,7 @@ class CreateScreen(Screen):
                 text=cd['back'], multiline=False,
                 size_hint_y=None, height=52,
                 background_color=SURFACE, foreground_color=TEXT,
-                hint_text='Back',
+                hint_text='Back', font_name=CJK_FONT,
             )
 
             card_box.add_widget(top_row)
