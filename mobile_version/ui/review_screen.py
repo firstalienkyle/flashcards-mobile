@@ -152,6 +152,7 @@ class ReviewScreen(Screen):
         )
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True
+        self._quiz_input.height = 0   # collapsed; expanded to BTN_H when shown
         root.add_widget(self._quiz_input)
 
         # ── Nav — Prev | Flip/Submit | Next ──────────────────────────────────
@@ -332,6 +333,7 @@ class ReviewScreen(Screen):
         self._quiz_input.text = ''
         self._quiz_input.opacity = 0
         self._quiz_input.disabled = True
+        self._quiz_input.height = 0
         self._action_btn.disabled = False
         self._side_label.text = 'FRONT'
         self._progress_label.text = f'{self._index + 1} / {len(self._queue)}'
@@ -344,6 +346,7 @@ class ReviewScreen(Screen):
         if card.is_quiz and card.id not in self._seen:
             # Quiz card: show answer input immediately
             self._quiz_mode = True
+            self._quiz_input.height = BTN_H
             self._quiz_input.opacity = 1
             self._quiz_input.disabled = False
             self._action_btn.text = 'Submit'
@@ -354,6 +357,7 @@ class ReviewScreen(Screen):
                     and card.id not in self._seen
                     and random.random() < quiz_prob):
                 self._quiz_mode = True
+                self._quiz_input.height = BTN_H
                 self._quiz_input.opacity = 1
                 self._quiz_input.disabled = False
                 self._action_btn.text = 'Submit'
@@ -399,6 +403,7 @@ class ReviewScreen(Screen):
         self._seen.add(card.id)
         self._quiz_input.disabled = True
         self._quiz_input.opacity = 0
+        self._quiz_input.height = 0
 
         if answers_match(user_ans, card.back):
             self._feedback_label.text = 'Correct!'
