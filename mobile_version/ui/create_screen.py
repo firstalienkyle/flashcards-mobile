@@ -23,7 +23,6 @@ class CreateScreen(Screen):
         self._deck_id = deck_id
         self._deck_map = {}
         self._gen_rows = []
-        self._is_quiz = False
         self._build()
 
     def _build(self):
@@ -100,11 +99,6 @@ class CreateScreen(Screen):
             minimum_height=lambda inst, h: setattr(inst, 'height', max(h, BTN_H))
         )
         body.add_widget(self._back_input)
-
-        # Quiz toggle — tapping cycles Normal ↔ Quiz
-        self._quiz_btn = btn('Mode: Normal Card', color=SECONDARY)
-        self._quiz_btn.bind(on_press=self._toggle_quiz)
-        body.add_widget(self._quiz_btn)
 
         save = btn('Save Card')
         save.bind(on_press=self._save_card)
@@ -229,15 +223,6 @@ class CreateScreen(Screen):
         content.add_widget(btn_row)
         popup.open()
 
-    def _toggle_quiz(self, _):
-        self._is_quiz = not self._is_quiz
-        if self._is_quiz:
-            self._quiz_btn.text = 'Mode: Quiz Card  (user must type answer)'
-            self._quiz_btn.background_color = SUCCESS
-        else:
-            self._quiz_btn.text = 'Mode: Normal Card'
-            self._quiz_btn.background_color = SECONDARY
-
     # ── Manual save ───────────────────────────────────────────────────────────
 
     def _save_card(self, _):
@@ -248,12 +233,10 @@ class CreateScreen(Screen):
             self._import_status.text = 'Fill in front, back, and select a deck.'
             self._import_status.color = DANGER
             return
-        self.app.db.create_card(Card(front=front, back=back,
-                                     is_quiz=self._is_quiz, deck_id=deck_id))
+        self.app.db.create_card(Card(front=front, back=back, deck_id=deck_id))
         self._front_input.text = ''
         self._back_input.text = ''
-        kind = 'Quiz card' if self._is_quiz else 'Card'
-        self._import_status.text = f'{kind} saved!'
+        self._import_status.text = 'Card saved!'
         self._import_status.color = SUCCESS
 
     # ── File picker ───────────────────────────────────────────────────────────
@@ -359,7 +342,7 @@ class CreateScreen(Screen):
 
         for cd in cards_data:
             card_box = BoxLayout(orientation='vertical',
-                                 size_hint_y=None, height=182, spacing=4)
+                                 size_hint_y=None, height=116, spacing=4)
 
             top_row = BoxLayout(size_hint_y=None, height=52, spacing=6)
             front_e = TextInput(
@@ -381,19 +364,10 @@ class CreateScreen(Screen):
                 hint_text='Back',
             )
 
-            quiz_b = btn('Normal', color=SECONDARY, height=BTN_H // 2)
-            quiz_b._is_quiz = False
-            def _toggle_q(_, b=quiz_b):
-                b._is_quiz = not b._is_quiz
-                b.text = 'Quiz' if b._is_quiz else 'Normal'
-                b.background_color = SUCCESS if b._is_quiz else SECONDARY
-            quiz_b.bind(on_press=_toggle_q)
-
             card_box.add_widget(top_row)
             card_box.add_widget(back_e)
-            card_box.add_widget(quiz_b)
             self._gen_layout.add_widget(card_box)
-            self._gen_rows.append((front_e, back_e, quiz_b, card_box))
+            self._gen_rows.append((front_e, back_e, card_box))
 
         save_all = btn('Save All Cards', color=SUCCESS)
         save_all.bind(on_press=lambda _: self._save_generated(deck_id))
@@ -401,17 +375,16 @@ class CreateScreen(Screen):
 
     def _remove_card(self, card_box):
         self._gen_layout.remove_widget(card_box)
-        self._gen_rows = [(f, b, q, box) for f, b, q, box in self._gen_rows
+        self._gen_rows = [(f, b, box) for f, b, box in self._gen_rows
                           if box is not card_box]
 
     def _save_generated(self, deck_id):
         saved = 0
-        for front_e, back_e, quiz_b, _ in self._gen_rows:
+        for front_e, back_e, _ in self._gen_rows:
             front = front_e.text.strip()
             back = back_e.text.strip()
             if front and back:
                 self.app.db.create_card(Card(front=front, back=back,
-                                             is_quiz=quiz_b._is_quiz,
                                              deck_id=deck_id))
                 saved += 1
         self._gen_layout.clear_widgets()

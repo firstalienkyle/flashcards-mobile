@@ -160,23 +160,22 @@ class DeckScreen(Screen):
             self._card_list.add_widget(row)
 
     def _preview_card(self, card):
-        """Full-screen overlay that mirrors the review session layout exactly."""
-        showing_front = [True]   # mutable cell so inner functions can toggle it
+        """Full-screen modal that mirrors the review session layout exactly."""
+        from kivy.uix.modalview import ModalView
+        showing_front = [True]
 
-        # ── Outer overlay (full screen, dark BG) ──────────────────────────────
-        overlay = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
-        with overlay.canvas.before:
-            Color(*BG)
-            bg_rect = Rectangle(pos=overlay.pos, size=overlay.size)
-        overlay.bind(pos=lambda w, _: setattr(bg_rect, 'pos', w.pos))
-        overlay.bind(size=lambda w, _: setattr(bg_rect, 'size', w.size))
+        # ── ModalView: guaranteed full-screen, blocks background touches ──────
+        mv = ModalView(size_hint=(1, 1), auto_dismiss=False,
+                       background='', background_color=BG)
+
+        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
         # ── Side badge ────────────────────────────────────────────────────────
         side_lbl = lbl('FRONT', font_size=FONT_SMALL, color=MUTED,
                         height=32, halign='center')
-        overlay.add_widget(side_lbl)
+        root.add_widget(side_lbl)
 
-        # ── Card panel (identical RoundedRectangle style) ─────────────────────
+        # ── Card panel ────────────────────────────────────────────────────────
         ref = {}
         panel = BoxLayout(orientation='vertical', padding=16, spacing=8)
         with panel.canvas.before:
@@ -191,7 +190,7 @@ class DeckScreen(Screen):
         card_content.bind(minimum_height=card_content.setter('height'))
         card_scroll.add_widget(card_content)
         panel.add_widget(card_scroll)
-        overlay.add_widget(panel)
+        root.add_widget(panel)
 
         # ── Nav row: Flip | Close ─────────────────────────────────────────────
         nav = BoxLayout(size_hint_y=None, height=BTN_H, spacing=10)
@@ -199,9 +198,11 @@ class DeckScreen(Screen):
         close_btn = btn('Close', color=SECONDARY)
         nav.add_widget(flip_btn)
         nav.add_widget(close_btn)
-        overlay.add_widget(nav)
+        root.add_widget(nav)
 
-        # ── Helper: build per-line rows (same as review_screen) ───────────────
+        mv.add_widget(root)
+
+        # ── Helper: build per-line rows ───────────────────────────────────────
         def _build_lines(text, lang):
             card_content.clear_widgets()
             for line in text.splitlines():
@@ -246,15 +247,10 @@ class DeckScreen(Screen):
                 _build_lines(card.back, 'en')
 
         flip_btn.bind(on_press=_flip)
+        close_btn.bind(on_press=lambda _: mv.dismiss())
 
-        # ── Initial state: show front ─────────────────────────────────────────
         _build_lines(card.front, 'es')
-
-        # ── Mount overlay on this screen ──────────────────────────────────────
-        overlay.size_hint = (1, 1)
-        overlay.pos_hint = {'x': 0, 'y': 0}
-        close_btn.bind(on_press=lambda _: self.remove_widget(overlay))
-        self.add_widget(overlay)
+        mv.open()
 
     def _on_search(self, instance, value):
         self._load(filter_text=value)

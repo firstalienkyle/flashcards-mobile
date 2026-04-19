@@ -40,7 +40,7 @@ def apply_memory_delta(card: Card, result: Literal['seen', 'correct', 'incorrect
     if result == "seen":
         delta = 8 if not already_seen else 3
     elif result == "correct":
-        delta = max(5.0, 20.0 - level * 0.1)
+        delta = max(30.0, 40.0 - level * 0.1)
     else:
-        delta = -(5.0 + level * 0.1)
+        delta = -(25.0 + level * 0.15)
     return max(0.0, min(100.0, level + delta))

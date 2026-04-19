@@ -352,7 +352,7 @@ class ReviewScreen(Screen):
             self._action_btn.text = 'Submit'
         else:
             # Dynamic quiz chance for regular cards (matches web logic)
-            quiz_prob = 0.05 + (card.memory_level / 100) * 0.25
+            quiz_prob = 0.10 + (card.memory_level / 100) * 0.60
             if (not card.is_quiz
                     and card.id not in self._seen
                     and random.random() < quiz_prob):
