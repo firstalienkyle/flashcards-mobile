@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APKs
 
 on:
   push:
@@ -6,12 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-flashcards:
     runs-on: ubuntu-22.04
-
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +38,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-${{ hashFiles('mobile_version/buildozer.spec') }}
-          restore-keys: buildozer-
+          key: buildozer-flashcards-${{ hashFiles('mobile_version/buildozer.spec') }}
+          restore-keys: buildozer-flashcards-
 
       - name: Accept Android SDK licences
         run: |
@@ -50,18 +48,102 @@ jobs:
           find /usr/local/lib/android/sdk -name "sdkmanager" 2>/dev/null | head -1 | \
             xargs -I{} sh -c 'yes | {} --licenses' || true
 
-      - name: Build APK
+      - name: Build Flashcards APK
         working-directory: mobile_version
         run: yes | buildozer android debug 2>&1
 
-      - name: Rename APK
-        run: mv mobile_version/bin/*.apk mobile_version/bin/flashcards.apk
+      - name: Upload flashcards APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: flashcards-apk
+          path: mobile_version/bin/*.apk
+
+  build-pictures:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev \
+            build-essential ccache lld
+
+      - name: Use Java 17
+        run: echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> "$GITHUB_ENV"
+
+      - name: Install buildozer and cython
+        run: pip install buildozer==1.5.0 cython==0.29.37
+
+      - name: Cache buildozer global dir
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-pictures-${{ hashFiles('picture_app/buildozer.spec') }}
+          restore-keys: buildozer-pictures-
+
+      - name: Accept Android SDK licences
+        run: |
+          mkdir -p "$HOME/.android"
+          touch "$HOME/.android/repositories.cfg"
+          find /usr/local/lib/android/sdk -name "sdkmanager" 2>/dev/null | head -1 | \
+            xargs -I{} sh -c 'yes | {} --licenses' || true
+
+      - name: Build Pictures APK
+        working-directory: picture_app
+        run: yes | buildozer android debug 2>&1
+
+      - name: Upload pictures APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pictures-apk
+          path: picture_app/bin/*.apk
+
+  release:
+    needs: [build-flashcards, build-pictures]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download flashcards APK
+        uses: actions/download-artifact@v4
+        with:
+          name: flashcards-apk
+          path: dist/
+
+      - name: Download pictures APK
+        uses: actions/download-artifact@v4
+        with:
+          name: pictures-apk
+          path: dist/
+
+      - name: Rename APKs
+        run: |
+          mv dist/*flashcards*.apk dist/flashcards.apk 2>/dev/null || \
+            find dist -name "*.apk" | grep -i flash | head -1 | xargs -I{} mv {} dist/flashcards.apk || true
+          mv dist/*pictures*.apk dist/pictures.apk 2>/dev/null || \
+            find dist -name "*.apk" | grep -iv flash | head -1 | xargs -I{} mv {} dist/pictures.apk || true
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Flashcards (latest build)
-          body: Scan the QR code or tap the link below to install on Android.
-          files: mobile_version/bin/flashcards.apk
+          name: Latest build
+          body: Download the APKs below and install on Android.
+          files: |
+            dist/flashcards.apk
+            dist/pictures.apk
           make_latest: true
