@@ -1,18 +1,16 @@
+import random
+from pathlib import Path
+
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.widget import Widget
 from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.graphics import Color, Rectangle
 
 import data.database as db
 from ui.theme import (
     apply_bg, btn, lbl,
-    SURFACE, SECONDARY, MUTED, TEXT, BG,
+    SECONDARY, MUTED, TEXT,
     FONT_TITLE, FONT_BODY, FONT_SMALL,
     BTN_H, ROW_H, PAD, GAP,
 )
@@ -22,116 +20,49 @@ class HomeScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
-        self._viewer = None
+        self._buttons = []
         self._build()
 
     def _build(self):
         apply_bg(self)
         root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
 
-        # ── Header ──────────────────────────────────────────────────────────
+        # ── Header: title + Settings top-right ──────────────────────────────
         header = BoxLayout(size_hint_y=None, height=ROW_H, spacing=8)
-        header.add_widget(lbl('Pictures', font_size=FONT_TITLE, bold=True,
-                               height=ROW_H))
+        header.add_widget(Widget())  # spacer so Settings hugs the right
         settings_btn = btn('Settings', color=SECONDARY, height=ROW_H)
-        settings_btn.size_hint_x = 0.38
+        settings_btn.size_hint_x = None
+        settings_btn.width = 200
         settings_btn.bind(on_press=lambda _: self.app.show_settings())
         header.add_widget(settings_btn)
         root.add_widget(header)
 
-        # ── Picture grid ─────────────────────────────────────────────────────
-        scroll = ScrollView(do_scroll_x=False)
-        self._grid = GridLayout(cols=2, spacing=GAP, size_hint_y=None,
-                                padding=[0, 4])
-        self._grid.bind(minimum_height=self._grid.setter('height'))
-        scroll.add_widget(self._grid)
-        root.add_widget(scroll)
+        # ── Picture label ────────────────────────────────────────────────────
+        self._caption = lbl('', font_size=FONT_TITLE, bold=True,
+                             halign='center', size_hint_y=None, height=56)
+        root.add_widget(self._caption)
+
+        # ── Picture (fills remaining space) ─────────────────────────────────
+        self._image = Image(allow_stretch=True, keep_ratio=True)
+        root.add_widget(self._image)
+
+        # ── Random button ────────────────────────────────────────────────────
+        random_btn = btn('Random', height=BTN_H)
+        random_btn.bind(on_press=lambda _: self._show_random())
+        root.add_widget(random_btn)
 
         self.add_widget(root)
 
     def on_enter(self):
-        self._load()
+        self._buttons = db.get_all_buttons()
+        self._show_random()
 
-    def _load(self):
-        self._grid.clear_widgets()
-        buttons = db.get_all_buttons()
-        if not buttons:
-            self._grid.cols = 1
-            self._grid.add_widget(
-                lbl('No pictures yet.\nGo to Settings to import some.',
-                    color=MUTED, height=120, halign='center')
-            )
+    def _show_random(self):
+        self._buttons = db.get_all_buttons()
+        if not self._buttons:
+            self._caption.text = 'No pictures yet'
+            self._image.source = ''
             return
-
-        self._grid.cols = 2
-        TILE_H = 220
-        for pb in buttons:
-            tile = self._make_tile(pb, TILE_H)
-            self._grid.add_widget(tile)
-
-    def _make_tile(self, pb, tile_h):
-        """A tappable image tile with a label below."""
-        tile = BoxLayout(orientation='vertical', size_hint_y=None,
-                         height=tile_h, spacing=4)
-        with tile.canvas.before:
-            Color(*SURFACE)
-            rect = Rectangle(pos=tile.pos, size=tile.size)
-        tile.bind(pos=lambda w, _: setattr(rect, 'pos', w.pos))
-        tile.bind(size=lambda w, _: setattr(rect, 'size', w.size))
-
-        from pathlib import Path
-        if Path(pb.path).exists():
-            img = Image(source=pb.path, allow_stretch=True,
-                        keep_ratio=True, size_hint_y=1)
-        else:
-            img = lbl('[image missing]', color=MUTED,
-                      halign='center', size_hint_y=1)
-
-        name_lbl = lbl(pb.label, font_size=FONT_SMALL, color=TEXT,
-                        halign='center', height=40)
-        tile.add_widget(img)
-        tile.add_widget(name_lbl)
-
-        # Tap anywhere on the tile → full-screen viewer
-        tap = Button(background_normal='', background_color=(0, 0, 0, 0),
-                     size_hint=(1, 1))
-        tap.bind(on_press=lambda _, p=pb.path, lbl_t=pb.label:
-                 self._open_viewer(p, lbl_t))
-
-        fl = FloatLayout(size_hint_y=None, height=tile_h)
-        tile.size_hint_y = None
-        tile.size = (fl.width, tile_h)
-        fl.add_widget(tile)
-        fl.add_widget(tap)
-        return fl
-
-    def _open_viewer(self, path, label_text):
-        """Show a full-screen modal with the image and a close button."""
-        from kivy.uix.modalview import ModalView
-        from pathlib import Path
-
-        mv = ModalView(size_hint=(1, 1), auto_dismiss=True,
-                       background='', background_color=BG)
-
-        root = BoxLayout(orientation='vertical', padding=PAD, spacing=GAP)
-
-        if Path(path).exists():
-            img = Image(source=path, allow_stretch=True, keep_ratio=True,
-                        size_hint=(1, 1))
-        else:
-            img = lbl('[image not found]', color=MUTED, halign='center')
-
-        caption = Label(text=label_text, font_size=FONT_BODY, color=TEXT,
-                        size_hint_y=None, height=50, halign='center')
-        caption.bind(size=lambda inst, _: setattr(inst, 'text_size', (inst.width, None)))
-
-        close = Button(text='Close', font_size=FONT_BODY, bold=True,
-                       background_normal='', background_color=SECONDARY,
-                       color=TEXT, size_hint_y=None, height=BTN_H)
-        close.bind(on_press=lambda _: mv.dismiss())
-
-        root.add_widget(img)
-        root.add_widget(caption)
-        root.add_widget(close)
-        mv.add_widget(root)
-        mv.open()
+        pb = random.choice(self._buttons)
+        self._caption.text = pb.label
+        self._image.source = pb.path if Path(pb.path).exists() else ''
