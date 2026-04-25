@@ -101,9 +101,10 @@ class SettingsScreen(Screen):
             try:
                 from plyer import filechooser
                 filechooser.open_file(
-                    on_selection=self._on_file_selected,
+                    on_selection=self._on_files_selected,
                     filters=['image/*'],
-                    title='Choose a picture',
+                    title='Choose pictures',
+                    multiple=True,
                 )
             except Exception:
                 self._show_path_popup()
@@ -114,7 +115,7 @@ class SettingsScreen(Screen):
                     import subprocess
                     script = (
                         'POSIX path of (choose file '
-                        'with prompt "Choose a picture" '
+                        'with prompt "Choose pictures" '
                         'of type {"public.image", "jpg", "jpeg", "png", "gif", "bmp", "webp"})'
                     )
                     result = subprocess.run(
@@ -123,7 +124,7 @@ class SettingsScreen(Screen):
                     )
                     path = result.stdout.strip()
                     if path:
-                        Clock.schedule_once(lambda dt: self._ask_label(path))
+                        Clock.schedule_once(lambda dt: self._on_files_selected([path]))
                 except Exception:
                     Clock.schedule_once(lambda dt: self._show_path_popup())
             threading.Thread(target=_pick, daemon=True).start()
@@ -160,12 +161,16 @@ class SettingsScreen(Screen):
         content.add_widget(btn_row)
         popup.open()
 
-    def _on_file_selected(self, selection):
+    def _on_files_selected(self, selection):
         if not selection:
             return
-        path = selection[0]
-        # Ask for a label after selection
-        Clock.schedule_once(lambda dt: self._ask_label(path))
+        for path in selection:
+            from pathlib import Path as _Path
+            self._save_picture(path, _Path(path).stem)
+        count = len(selection)
+        self._status.text = f'Added {count} picture{"s" if count != 1 else ""}'
+        from ui.theme import SUCCESS
+        self._status.color = SUCCESS
 
     def _ask_label(self, path):
         from pathlib import Path
@@ -233,7 +238,7 @@ class SettingsScreen(Screen):
     def _delete_confirm(self, pb):
         content = BoxLayout(orientation='vertical', padding=12, spacing=8)
         content.add_widget(lbl(
-            f'Delete "{pb.label}"?\nThe image file will also be removed.',
+            f'Remove "{pb.label}" from the app?\n(The original file is not deleted.)',
             font_size=FONT_SMALL, color=DANGER, height=80, halign='center',
         ))
         popup = Popup(title='Delete', content=content, size_hint=(0.85, 0.40))
