@@ -429,7 +429,7 @@ class ReviewScreen(Screen):
         self._showing_front = False
         self._side_label.text = 'BACK'
         lines = [l for l in card.back.splitlines() if l.strip()]
-        self._rebuild_card_lines(lines, lang='en')
+        self._rebuild_card_lines(lines)
         self._action_btn.text = 'Flip'
         self._update_mem_display(card)
 
