@@ -25,9 +25,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android build tools
+      - name: Install Android SDK components and NDK
         run: |
-          sdkmanager "build-tools;33.0.2" "platforms;android-33" "platform-tools"
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+            "build-tools;33.0.2" \
+            "platforms;android-33" \
+            "platform-tools" \
+            "ndk;25.2.9519653"
 
       - name: Install system dependencies
         run: |
@@ -36,13 +40,29 @@ jobs:
             python3-pip build-essential git zip unzip \
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev
+            libtinfo6 cmake libffi-dev libssl-dev
           pip install buildozer cython
+
+      - name: Cache buildozer directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: buildozer-
 
       - name: Build APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-        run: buildozer android debug
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
+        run: buildozer -v android debug 2>&1 | tee buildozer.log
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildozer-log
+          path: buildozer.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
