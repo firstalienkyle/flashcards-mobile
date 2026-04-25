@@ -16,6 +16,16 @@ class Card:
 
 
 @dataclass
+class PhotoCard:
+    path: str
+    memory_level: float = 0.0
+    id: Optional[int] = None
+    last_reviewed: Optional[datetime] = None
+    review_count: int = 0
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
 class Deck:
     name: str
     id: Optional[int] = None

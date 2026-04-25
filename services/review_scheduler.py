@@ -4,33 +4,29 @@ from datetime import datetime
 from typing import Literal
 from data.models import Card
 
-def compute_effective_level(card: Card, decay_rate: float) -> float:
+def compute_effective_level(item, decay_rate: float) -> float:
     """
     Memory level after applying time-based decay.
 
-    Stability grows with review_count so well-practiced cards decay much
-    slower than new ones:
-      - 0 reviews  → stability 1.0  (full decay rate)
-      - 5 reviews  → stability 3.0  (⅓ decay rate)
-      - 10 reviews → stability 5.0  (⅕ decay rate)
+    Decay slows for well-practiced items and for items that are closer to full
+    mastery, which is suitable for both cards and photo memory entries.
     """
-    if card.last_reviewed is None:
-        return card.memory_level
-    days_elapsed = (datetime.now() - card.last_reviewed).total_seconds() / 86400
-    stability = 1.0 + card.review_count * 0.4
+    if item.last_reviewed is None:
+        return item.memory_level
+    days_elapsed = (datetime.now() - item.last_reviewed).total_seconds() / 86400
+    stability = 1.0 + item.review_count * 0.35 + (item.memory_level / 100.0) * 2.0
     effective_decay = decay_rate / stability
-    return max(0.0, card.memory_level - effective_decay * days_elapsed)
+    return max(0.0, item.memory_level - effective_decay * days_elapsed)
 
-def build_review_queue(cards: list[Card], decay_rate: float, queue_size: int = 25) -> list[Card]:
-    """75% lowest-memory cards + 25% random from the rest, shuffled."""
-    if not cards:
+def build_review_queue(items: list, decay_rate: float, queue_size: int = 25) -> list:
+    """75% lowest-memory items + 25% random from the rest, shuffled."""
+    if not items:
         return []
 
-    sorted_cards = sorted(cards, key=lambda c: compute_effective_level(c, decay_rate))
-
-    n_priority = max(1, int(min(queue_size, len(cards)) * 0.75))
-    priority = sorted_cards[:n_priority]
-    remaining = sorted_cards[n_priority:]
+    sorted_items = sorted(items, key=lambda item: compute_effective_level(item, decay_rate))
+    n_priority = max(1, int(min(queue_size, len(items)) * 0.75))
+    priority = sorted_items[:n_priority]
+    remaining = sorted_items[n_priority:]
 
     n_random = min(queue_size - len(priority), len(remaining))
     random_pick = random.sample(remaining, n_random) if n_random > 0 else []
@@ -61,15 +57,18 @@ def apply_memory_delta(card: Card, result: Literal['seen', 'correct', 'incorrect
     level = card.memory_level
 
     if result == "seen":
-        # First flip this session: solid boost. Re-seen: small reinforcement.
-        delta = 8 if not already_seen else 3
+        # First flip this session: solid boost. Re-seen: smaller reinforcement.
+        if not already_seen:
+            delta = 8.0 * (1.0 - level / 100.0) + 4.0
+        else:
+            delta = max(1.0, 4.0 * (1.0 - level / 100.0))
 
     elif result == "correct":
-        # +20 at level 0 → +10 at level 100 (diminishing returns)
-        delta = max(5.0, 20.0 - level * 0.1)
+        # Stronger gain for weaker memories; diminishing returns as level climbs.
+        delta = max(3.0, 20.0 * (1.0 - level / 100.0))
 
     else:  # incorrect
-        # -5 at level 0 → -15 at level 100 (forgetting a strong memory hurts more)
-        delta = -(5.0 + level * 0.1)
+        # Forgetting hurts more when the memory is stronger.
+        delta = -(5.0 + level * 0.12)
 
     return max(0.0, min(100.0, level + delta))

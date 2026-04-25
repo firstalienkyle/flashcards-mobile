@@ -17,14 +17,19 @@ GREEN  = get_color_from_hex(config.GREEN + 'ff')
 RED    = get_color_from_hex(config.RED   + 'ff')
 
 
-def btn(text, on_press=None, color=None, **kw):
+def btn(text, on_press=None, color=None, font_size=16, height=None, **kw):
+    fs = dp(font_size)
     b = Button(
         text=text,
         background_color=color or ACCENT,
+        font_size=fs,
         size_hint_y=None,
-        height=dp(48),
+        height=height or dp(int(fs * 1.8)),
+        shorten=True,
+        shorten_from='right',
         **kw,
     )
+    b.bind(size=b.setter('text_size'))
     if on_press:
         b.bind(on_press=on_press)
     return b

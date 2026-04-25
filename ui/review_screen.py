@@ -13,6 +13,11 @@ from kivy.clock import Clock
 from kivy.metrics import dp
 from ui._widgets import btn, lbl, CARD, GREEN, RED, TEXT
 
+try:
+    from plyer import tts
+except ImportError:
+    tts = None
+
 
 class ReviewScreen(Screen):
     def __init__(self, app, **kwargs):
@@ -46,7 +51,7 @@ class ReviewScreen(Screen):
         self._card = BoxLayout(
             orientation='vertical',
             size_hint=(1, None),
-            height=dp(280),
+            height=dp(340),
             padding=dp(20),
             spacing=dp(8),
         )
@@ -74,10 +79,18 @@ class ReviewScreen(Screen):
         self._card_text.bind(size=self._card_text.setter('text_size'))
         self._card.add_widget(self._card_text)
 
+        self._speak_btn = btn('🔊', on_press=lambda _: self._speak_current(),
+                              size_hint_x=None, width=dp(52), height=dp(42))
+        self._speak_btn.opacity = 0
+        self._speak_btn.disabled = True
+        self._card.add_widget(self._speak_btn)
+
         # Quiz input (hidden by default)
         self._quiz_ti = TextInput(
             hint_text='Type your answer…',
             multiline=False,
+            input_type='text',
+            keyboard_suggestions=True,
             size_hint_y=None,
             height=dp(44),
             opacity=0,
@@ -103,7 +116,15 @@ class ReviewScreen(Screen):
         self._next_btn = btn('Next →', on_press=lambda _: self._go_next(),
                              size_hint_x=None, width=dp(90))
         nav.add_widget(self._next_btn)
+        self._mem_up_btn = btn('✓', on_press=lambda _: self._set_memory(100),
+                               size_hint_x=None, width=dp(52))
+        nav.add_widget(self._mem_up_btn)
+        self._mem_down_btn = btn('✕', on_press=lambda _: self._set_memory(0),
+                                 size_hint_x=None, width=dp(52))
+        nav.add_widget(self._mem_down_btn)
         nav.add_widget(BoxLayout())
+        self._level_lbl = lbl('', size=12, halign='right')
+        nav.add_widget(self._level_lbl)
         root.add_widget(nav)
 
         self.add_widget(root)
@@ -131,16 +152,18 @@ class ReviewScreen(Screen):
         self._hide_quiz()
 
         card = self._queue[self._index]
-        self._card_text.text = card.front
+        self._card_text.text = self._format_side_text(card.front)
         self._side_lbl.text  = 'FRONT'
         self._progress_lbl.text = f'{self._index + 1} / {len(self._queue)}'
+        self._level_lbl.text = f'Mem {card.memory_level:.0f}%'
         self._prev_btn.disabled = (self._index == 0)
         self._next_btn.disabled = (self._index >= len(self._queue) - 1)
 
         if card.is_quiz and card.id not in self._seen:
-            # True quiz card — must type answer
-            self._dynamic_quiz = False
-            self._show_quiz()
+            # Manual quiz cards are shown as questions until first success.
+            self._dynamic_quiz = True
+            self._quiz_direction = random.choice(('front_to_back', 'back_to_front'))
+            self._set_quiz_prompt(card)
             self._action_btn.text     = 'Submit'
             self._action_btn.disabled = True
             self._quiz_ti.bind(text=self._on_quiz_text_change)
@@ -149,11 +172,11 @@ class ReviewScreen(Screen):
             self._action_btn.text     = 'Next →'
             self._action_btn.disabled = False
         else:
-            # Flip card: dynamic quiz probability scales with memory level
-            quiz_prob = 0.05 + (card.memory_level / 100) * 0.25
+            quiz_prob = card.memory_level / 100.0
             if card.id not in self._seen and random.random() < quiz_prob:
                 self._dynamic_quiz = True
-                self._show_quiz()
+                self._quiz_direction = random.choice(('front_to_back', 'back_to_front'))
+                self._set_quiz_prompt(card)
                 self._action_btn.text     = 'Submit'
                 self._action_btn.disabled = True
                 self._quiz_ti.bind(text=self._on_quiz_text_change)
@@ -161,6 +184,8 @@ class ReviewScreen(Screen):
                 self._dynamic_quiz = False
                 self._action_btn.text     = 'Flip'
                 self._action_btn.disabled = False
+
+        self._update_speak_visibility(card)
 
     def _show_quiz(self):
         self._quiz_ti.text     = ''
@@ -174,6 +199,72 @@ class ReviewScreen(Screen):
             self._quiz_ti.unbind(text=self._on_quiz_text_change)
         except Exception:
             pass
+
+    def _set_quiz_prompt(self, card):
+        self._show_quiz()
+        if self._quiz_direction == 'front_to_back':
+            self._card_text.text = self._format_side_text(card.front)
+            self._quiz_answer = card.back
+        else:
+            self._card_text.text = self._format_side_text(card.back)
+            self._quiz_answer = card.front
+        self._side_lbl.text = 'QUIZ'
+
+    def _format_side_text(self, text: str) -> str:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(lines) <= 1:
+            if '|' in text:
+                parts = [p.strip() for p in text.split('|') if p.strip()]
+                if parts:
+                    lines = parts
+            elif ';' in text:
+                parts = [p.strip() for p in text.split(';') if p.strip()]
+                if parts:
+                    lines = parts
+        return '\n'.join(lines) if lines else text.strip()
+
+    def _update_speak_visibility(self, card):
+        can_speak = self._showing_front and not self._dynamic_quiz
+        self._speak_btn.opacity = 1 if can_speak else 0
+        self._speak_btn.disabled = not can_speak
+
+    def _detect_text_language(self, text: str) -> str:
+        if any('\u4e00' <= ch <= '\u9fff' for ch in text):
+            return 'zh'
+        return 'en'
+
+    def _speak_current(self):
+        if not hasattr(self, '_queue') or not self._queue:
+            return
+        card = self._queue[self._index]
+        if not self._showing_front or self._dynamic_quiz:
+            return
+        text = card.front
+        language = 'es'
+        try:
+            if tts is not None:
+                try:
+                    tts.speak(text, lang=language)
+                except TypeError:
+                    tts.speak(text)
+            else:
+                self._explanation_lbl.text = 'TTS unavailable on this device.'
+        except Exception as e:
+            self._explanation_lbl.text = f'Could not speak: {e}'
+
+    def _set_memory(self, value: float):
+        card = self._queue[self._index]
+        mem_before = card.memory_level
+        card.memory_level = float(value)
+        db.set_card_memory_level(card.id, card.memory_level, datetime.now())
+        if self._session_id:
+            db.record_session_card_result(
+                self._session_id, card.id, 'manual_adjust',
+                memory_before=mem_before, memory_after=card.memory_level,
+            )
+        self._level_lbl.text = f'Mem {card.memory_level:.0f}%'
+        self._explanation_lbl.text = f'Memory saved to {card.memory_level:.0f}%.'
+        self._show_card()
 
     def _on_quiz_text_change(self, _, text):
         has_text = bool(text.strip())
@@ -206,9 +297,10 @@ class ReviewScreen(Screen):
 
     def _reveal_back(self, card):
         self._showing_front    = False
-        self._card_text.text   = card.back
+        self._card_text.text   = self._format_side_text(card.back)
         self._side_lbl.text    = 'BACK'
         self._action_btn.text  = 'Next →'
+        self._update_speak_visibility(card)
 
     def _submit_quiz(self):
         card     = self._queue[self._index]
@@ -217,13 +309,13 @@ class ReviewScreen(Screen):
             return
         self._hide_quiz()
 
-        if answers_match(user_ans, card.back):
+        if answers_match(user_ans, self._quiz_answer):
             self._card_text.color = GREEN
-            self._card_text.text  = f'✓ Correct!\n\nAnswer: {card.back}'
+            self._card_text.text  = f'✓ Correct!\n\nAnswer: {self._quiz_answer}'
             self._record_and_advance(card, 'correct', delay_s=1.5)
         else:
             self._card_text.color = RED
-            self._card_text.text  = f'✗ Incorrect\n\nCorrect: {card.back}'
+            self._card_text.text  = f'✗ Incorrect\n\nCorrect: {self._quiz_answer}'
             if self._dynamic_quiz:
                 self._record_and_advance(card, 'incorrect', delay_s=2.5)
             else:

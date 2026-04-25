@@ -39,6 +39,10 @@ class FlashcardsApp(App):
         from ui.deck_screen import DeckScreen
         self._switch(DeckScreen(app=self, deck_id=deck_id, name='deck'))
 
+    def show_photos(self):
+        from ui.photo_screen import PhotoScreen
+        self._switch(PhotoScreen(app=self, name='photos'))
+
     def show_settings(self):
         from ui.settings_screen import SettingsScreen
         self._switch(SettingsScreen(app=self, name='settings'))

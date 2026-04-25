@@ -44,6 +44,8 @@ class DeckScreen(Screen):
         self._search = TextInput(
             hint_text='Search cards…',
             multiline=False,
+            input_type='text',
+            keyboard_suggestions=True,
             size_hint_y=None,
             height=dp(40),
         )
@@ -52,7 +54,7 @@ class DeckScreen(Screen):
 
         # Card list
         scroll = ScrollView()
-        self._list = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(6))
+        self._list = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(10), padding=(0, dp(8)))
         self._list.bind(minimum_height=self._list.setter('height'))
         scroll.add_widget(self._list)
         self._root.add_widget(scroll)
@@ -77,12 +79,12 @@ class DeckScreen(Screen):
             self._list.add_widget(self._card_row(card))
 
     def _card_row(self, card: Card):
-        row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(64),
-                        padding=(dp(8), dp(4)), spacing=dp(6))
+        row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(110),
+                        padding=(dp(12), dp(10)), spacing=dp(10))
         tag  = ' [Quiz]' if card.is_quiz else ''
         info = BoxLayout(orientation='vertical')
-        info.add_widget(lbl(card.front + tag, bold=True, size=14))
-        info.add_widget(lbl(card.back, size=12))
+        info.add_widget(lbl(card.front + tag, bold=True, size=14, halign='left'))
+        info.add_widget(lbl(card.back, size=12, halign='left'))
         row.add_widget(info)
         row.add_widget(btn('✎', on_press=lambda _, c=card: self._edit_card(c),
                            size_hint_x=None, width=dp(40)))
@@ -92,10 +94,10 @@ class DeckScreen(Screen):
 
     def _edit_card(self, card: Card):
         content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(12))
-        front_ti = TextInput(text=card.front, multiline=True,
-                             size_hint_y=None, height=dp(70))
-        back_ti  = TextInput(text=card.back, multiline=True,
-                             size_hint_y=None, height=dp(70))
+        front_ti = TextInput(text=card.front, multiline=True, input_type='text',
+                             keyboard_suggestions=True, size_hint_y=None, height=dp(70))
+        back_ti  = TextInput(text=card.back, multiline=True, input_type='text',
+                             keyboard_suggestions=True, size_hint_y=None, height=dp(70))
 
         quiz_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(36))
         quiz_row.add_widget(lbl('Quiz card:', size=14, size_hint_x=None, width=dp(90)))

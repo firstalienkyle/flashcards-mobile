@@ -43,11 +43,13 @@ class CreateScreen(Screen):
 
         # Front / Back inputs
         root.add_widget(lbl('Front:', size=14))
-        self._front_ti = TextInput(multiline=True, size_hint_y=None, height=dp(70))
+        self._front_ti = TextInput(multiline=True, input_type='text', keyboard_suggestions=True,
+                                     size_hint_y=None, height=dp(70))
         root.add_widget(self._front_ti)
 
         root.add_widget(lbl('Back:', size=14))
-        self._back_ti = TextInput(multiline=True, size_hint_y=None, height=dp(70))
+        self._back_ti = TextInput(multiline=True, input_type='text', keyboard_suggestions=True,
+                                  size_hint_y=None, height=dp(70))
         root.add_widget(self._back_ti)
 
         # Quiz checkbox
@@ -185,8 +187,10 @@ class CreateScreen(Screen):
         for cd in cards_data:
             row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(52),
                             spacing=dp(6), padding=(dp(4), dp(2)))
-            front_ti = TextInput(text=cd.get('front', ''), multiline=False)
-            back_ti  = TextInput(text=cd.get('back',  ''), multiline=False)
+            front_ti = TextInput(text=cd.get('front', ''), multiline=False,
+                                 input_type='text', keyboard_suggestions=True)
+            back_ti  = TextInput(text=cd.get('back',  ''), multiline=False,
+                                 input_type='text', keyboard_suggestions=True)
             quiz_cb  = CheckBox(active=cd.get('is_quiz', False),
                                 size_hint_x=None, width=dp(36))
             del_btn  = btn('✕', size_hint_x=None, width=dp(40))

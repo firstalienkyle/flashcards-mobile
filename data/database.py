@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from data.models import Card, Deck, ReviewSession, SessionCard
+from data.models import Card, Deck, PhotoCard, ReviewSession, SessionCard
 import config
 
 _DB_PATH: Path = config.DB_PATH
@@ -47,6 +47,14 @@ def init_db() -> None:
                 result        TEXT    NOT NULL,
                 memory_before REAL    NOT NULL,
                 memory_after  REAL    NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS photos (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                path          TEXT    NOT NULL UNIQUE,
+                memory_level  REAL    NOT NULL DEFAULT 0.0,
+                last_reviewed TEXT,
+                review_count  INTEGER NOT NULL DEFAULT 0,
+                created_at    TEXT    NOT NULL
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -143,6 +151,13 @@ def update_card(card: Card) -> None:
             (card.front, card.back, int(card.is_quiz), card.id)
         )
 
+def set_card_memory_level(card_id: int, memory_level: float, last_reviewed: datetime) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE cards SET memory_level=?, last_reviewed=? WHERE id=?",
+            (memory_level, last_reviewed.isoformat(), card_id)
+        )
+
 def delete_card(card_id: int) -> None:
     with _conn() as conn:
         conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
@@ -154,7 +169,57 @@ def update_card_memory(card_id: int, memory_level: float, last_reviewed: datetim
             (memory_level, last_reviewed.isoformat(), card_id)
         )
 
-# ── Sessions ───────────────────────────────────────────────────────────────────
+# ── Photo cards ─────────────────────────────────────────────────────────────────
+
+def _row_to_photo(r: sqlite3.Row) -> PhotoCard:
+    return PhotoCard(
+        id=r["id"],
+        path=r["path"],
+        memory_level=r["memory_level"],
+        last_reviewed=datetime.fromisoformat(r["last_reviewed"]) if r["last_reviewed"] else None,
+        review_count=r["review_count"],
+        created_at=datetime.fromisoformat(r["created_at"]),
+    )
+
+
+def get_all_photos() -> list[PhotoCard]:
+    with _conn() as conn:
+        rows = conn.execute("SELECT * FROM photos ORDER BY created_at").fetchall()
+        return [_row_to_photo(r) for r in rows]
+
+
+def get_photo_by_path(path: str) -> PhotoCard | None:
+    with _conn() as conn:
+        row = conn.execute("SELECT * FROM photos WHERE path = ?", (path,)).fetchone()
+        return _row_to_photo(row) if row else None
+
+
+def add_photo_path(path: str) -> PhotoCard:
+    with _conn() as conn:
+        now = datetime.now().isoformat()
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO photos (path, memory_level, created_at) VALUES (?, ?, ?)",
+            (path, 0.0, now)
+        )
+        if cur.lastrowid:
+            return PhotoCard(id=cur.lastrowid, path=path, memory_level=0.0, created_at=datetime.fromisoformat(now))
+        existing = get_photo_by_path(path)
+        return existing
+
+
+def update_photo_memory(photo_id: int, memory_level: float, last_reviewed: datetime) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE photos SET memory_level=?, last_reviewed=?, review_count=review_count+1 WHERE id=?",
+            (memory_level, last_reviewed.isoformat(), photo_id)
+        )
+
+def set_photo_memory_level(photo_id: int, memory_level: float, last_reviewed: datetime) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE photos SET memory_level=?, last_reviewed=? WHERE id=?",
+            (memory_level, last_reviewed.isoformat(), photo_id)
+        )
 
 def create_session() -> ReviewSession:
     with _conn() as conn:

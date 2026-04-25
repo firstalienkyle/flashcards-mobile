@@ -38,6 +38,7 @@ class HomeScreen(Screen):
         btn_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(52), spacing=dp(8))
         btn_row.add_widget(btn('▶  Start Review', on_press=lambda _: self.app.show_review()))
         btn_row.add_widget(btn('+  New Card', on_press=lambda _: self.app.show_create()))
+        btn_row.add_widget(btn('🖼 Photo App', on_press=lambda _: self.app.show_photos()))
         root.add_widget(btn_row)
 
         # Scrollable deck grid (2-column)
