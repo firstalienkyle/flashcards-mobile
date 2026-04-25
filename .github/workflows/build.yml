@@ -46,6 +46,16 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Fix old sdkmanager broken on Java 17
+        run: |
+          NEW_SM=/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager
+          OLD_SM=/usr/local/lib/android/sdk/tools/bin/sdkmanager
+          if [ -f "$OLD_SM" ]; then
+            sudo mv "$OLD_SM" "${OLD_SM}.bak"
+            printf '#!/bin/bash\nexec "%s" "$@"\n' "$NEW_SM" | sudo tee "$OLD_SM"
+            sudo chmod +x "$OLD_SM"
+          fi
+
       - name: Point buildozer at system SDK
         run: |
           sed -i "s|\[buildozer\]|android.sdk_path = $ANDROID_SDK_ROOT\nandroid.ndk_path = $ANDROID_SDK_ROOT/ndk/25.2.9519653\n\n[buildozer]|" buildozer.spec
