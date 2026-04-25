@@ -48,8 +48,8 @@ jobs:
 
       - name: Point buildozer at system SDK
         run: |
-          echo "android.sdk_path = $ANDROID_SDK_ROOT" >> buildozer.spec
-          echo "android.ndk_path = $ANDROID_SDK_ROOT/ndk/25.2.9519653" >> buildozer.spec
+          sed -i "s|\[buildozer\]|android.sdk_path = $ANDROID_SDK_ROOT\nandroid.ndk_path = $ANDROID_SDK_ROOT/ndk/25.2.9519653\n\n[buildozer]|" buildozer.spec
+          grep "sdk_path\|ndk_path" buildozer.spec
 
       - name: Build APK
         run: |
