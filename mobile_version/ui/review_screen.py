@@ -177,19 +177,19 @@ class ReviewScreen(Screen):
         nav.add_widget(self._next_btn)
         root.add_widget(nav)
 
-        # ── Memory row — [-Mem] [Mem: XX%] [+Mem] ────────────────────────────
+        # ── Memory row — [✗] [Mem: XX%] [✓] ────────────────────────────
         MEM_H = BTN_H // 2
         mem_row = BoxLayout(size_hint_y=None, height=MEM_H, spacing=10)
-        mem_down = btn('-Mem', color=SECONDARY, height=MEM_H)
-        mem_down.bind(on_press=lambda _: self._adjust_memory(-10))
+        mem_down = btn('✗', color=DANGER, height=MEM_H)
+        mem_down.bind(on_press=lambda _: self._rate_and_next(0))
         mem_row.add_widget(mem_down)
 
         self._mem_label = lbl('', font_size=FONT_SMALL, color=MUTED,
                                height=MEM_H, halign='center')
         mem_row.add_widget(self._mem_label)
 
-        mem_up = btn('+Mem', color=SECONDARY, height=MEM_H)
-        mem_up.bind(on_press=lambda _: self._adjust_memory(10))
+        mem_up = btn('✓', color=SUCCESS, height=MEM_H)
+        mem_up.bind(on_press=lambda _: self._rate_and_next(100))
         mem_row.add_widget(mem_up)
         root.add_widget(mem_row)
 
@@ -282,50 +282,35 @@ class ReviewScreen(Screen):
     def _rebuild_card_lines(self, lines):
         """Replace card content with left-aligned per-line rows + speak buttons."""
         self._card_content.clear_widgets()
+        # Pre-compute available text width: window - outer padding - panel padding - spk - spacing
+        text_w = max(Window.width - 2 * PAD - 32 - SPK_W - 6, 80)
+
         for line in lines:
             if not line.strip():
                 continue
-            row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
 
+            # Measure wrapped height before inserting into layout so GridLayout
+            # never needs to reposition rows after the fact.
             line_lbl = Label(
                 text=line,
-                halign='left',
-                valign='middle',
-                size_hint_x=1,
-                size_hint_y=None,
-                height=LINE_H,
-                font_size=FONT_BODY,
-                font_name=CJK_FONT,
-                color=TEXT,
+                halign='left', valign='top',
+                size_hint_x=1, size_hint_y=None,
+                font_size=FONT_BODY, font_name=CJK_FONT, color=TEXT,
             )
-            # Set text_size width when label width is known (enables wrapping)
-            line_lbl.bind(
-                width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None))
-            )
-            # Grow row height to fit wrapped text
-            def _on_texture(inst, ts, r=row):
-                new_h = max(int(ts[1]) + 12, LINE_H)
-                inst.height = new_h
-                r.height = new_h
-            line_lbl.bind(texture_size=_on_texture)
+            line_lbl.text_size = (text_w, None)
+            line_lbl.texture_update()
+            row_h = max(int(line_lbl.texture_size[1]) + 12, LINE_H)
+            line_lbl.height = row_h
 
+            row = BoxLayout(size_hint_y=None, height=row_h, spacing=6)
             spk = Button(
-                text='Spk',
-                size_hint=(None, None),
-                width=SPK_W,
-                height=LINE_H,
-                font_size=FONT_SMALL,
-                bold=False,
-                background_normal='',
-                background_color=SECONDARY,
-                color=TEXT,
+                text='Spk', size_hint=(None, None),
+                width=SPK_W, height=row_h,
+                font_size=FONT_SMALL, background_normal='',
+                background_color=SECONDARY, color=TEXT,
             )
-            # Keep speak button height in sync with the row
-            row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
-
             captured_line = line
             spk.bind(on_press=lambda _, t=captured_line: _speak(t, _detect_lang(t)))
-
             row.add_widget(line_lbl)
             row.add_widget(spk)
             self._card_content.add_widget(row)
@@ -385,7 +370,7 @@ class ReviewScreen(Screen):
             self._side_label.text = 'BACK'
             lines = [l for l in card.back.splitlines() if l.strip()]
             self._rebuild_card_lines(lines)
-            # Record 'seen' on first reveal of back
+            # Record 'seen' and update memory on first reveal of back
             if card.id not in self._seen:
                 already_seen = False
                 self._seen.add(card.id)
@@ -465,6 +450,15 @@ class ReviewScreen(Screen):
         db.update_card_memory(card.id, new_level, datetime.now())
         card.memory_level = new_level
         self._update_mem_display(card)
+
+    def _rate_and_next(self, memory_value):
+        """Set memory to absolute value and advance to next card (no mastery tracking)."""
+        if not self._queue:
+            return
+        card = self._queue[self._index]
+        db.update_card_memory_from_button(card.id, memory_value)
+        card.memory_level = memory_value
+        self._go_next()
 
     def _update_mem_display(self, card):
         self._mem_label.text = f'Mem: {card.memory_level:.0f}%'

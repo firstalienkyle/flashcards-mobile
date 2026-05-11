@@ -88,9 +88,10 @@ class HomeScreen(Screen):
             self._current = None
             return
 
-        # Weight toward lower memory levels so weaker pictures appear more
-        weights = [max(5.0, 105.0 - pb.memory_level) for pb in self._buttons]
-        self._current = random.choices(self._buttons, weights=weights, k=1)[0]
+        # Sort by memory level; pick randomly from the bottom 75% (weakest pool)
+        sorted_btns = sorted(self._buttons, key=lambda b: b.memory_level)
+        pool_end = max(1, int(len(sorted_btns) * 0.75))
+        self._current = random.choice(sorted_btns[:pool_end])
         self._refresh_display()
 
     def _refresh_display(self):

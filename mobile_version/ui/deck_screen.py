@@ -115,21 +115,16 @@ class DeckScreen(Screen):
         self._card_list.clear_widgets()
         BTN_HALF = (BTN_H - 4) // 2
 
-        # Pre-compute available text width so row heights are stable from the start,
-        # preventing GridLayout from overlapping rows when heights change post-layout.
-        text_w = max(Window.width - 2 * PAD - 90 - 6, 100)
-
         for card in cards:
-            label_text = f'{card.front}  ->  {card.back}'
+            # First line only + memory level — short text, fits in BTN_H, no texture probe needed
+            front_line = card.front.splitlines()[0] if card.front.strip() else card.front
+            back_line  = card.back.splitlines()[0]  if card.back.strip()  else card.back
+            label_text = f'{front_line}  →  {back_line}  ·  {card.memory_level:.0f}%'
 
-            # Measure wrapped height before creating the row
-            text_lbl = lbl(label_text, font_size=FONT_SMALL, color=TEXT,
-                           halign='left')
+            text_lbl = lbl(label_text, font_size=FONT_SMALL, color=TEXT, halign='left')
             text_lbl.size_hint_y = None
-            text_lbl.text_size = (text_w, None)
-            text_lbl.texture_update()
-            row_h = max(int(text_lbl.texture_size[1]) + 20, BTN_H)
-            text_lbl.height = row_h
+            text_lbl.height = BTN_H
+            row_h = BTN_H
 
             row = BoxLayout(size_hint_y=None, height=row_h, spacing=6)
 
@@ -203,34 +198,32 @@ class DeckScreen(Screen):
         mv.add_widget(root)
 
         # ── Helper: build per-line rows ───────────────────────────────────────
+        # Pre-compute text width: window - modal padding - panel padding - spk - spacing
+        _text_w = max(Window.width - 2 * PAD - 32 - SPK_W - 6, 80)
+
         def _build_lines(text):
             card_content.clear_widgets()
             for line in text.splitlines():
                 if not line.strip():
                     continue
-                row = BoxLayout(size_hint_y=None, height=LINE_H, spacing=6)
                 line_lbl = Label(
                     text=line,
-                    halign='left', valign='middle',
-                    size_hint_x=1, size_hint_y=None, height=LINE_H,
+                    halign='left', valign='top',
+                    size_hint_x=1, size_hint_y=None,
                     font_size=FONT_BODY, font_name=CJK_FONT, color=TEXT,
                 )
-                line_lbl.bind(
-                    width=lambda inst, w: setattr(inst, 'text_size', (max(0, w), None))
-                )
-                def _on_tex(inst, ts, r=row):
-                    new_h = max(int(ts[1]) + 12, LINE_H)
-                    inst.height = new_h
-                    r.height = new_h
-                line_lbl.bind(texture_size=_on_tex)
+                line_lbl.text_size = (_text_w, None)
+                line_lbl.texture_update()
+                row_h = max(int(line_lbl.texture_size[1]) + 12, LINE_H)
+                line_lbl.height = row_h
 
+                row = BoxLayout(size_hint_y=None, height=row_h, spacing=6)
                 spk = Button(
                     text='Spk', size_hint=(None, None),
-                    width=SPK_W, height=LINE_H,
+                    width=SPK_W, height=row_h,
                     font_size=FONT_SMALL, background_normal='',
                     background_color=SECONDARY, color=TEXT,
                 )
-                row.bind(height=lambda _, h, b=spk: setattr(b, 'height', h))
                 spk.bind(on_press=lambda _, t=line: _speak(t, _detect_lang(t)))
                 row.add_widget(line_lbl)
                 row.add_widget(spk)
