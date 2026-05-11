@@ -12,13 +12,13 @@ def _log_signal(sig, frame):
 for _s in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
     signal.signal(_s, _log_signal)
 
-import data.database as db
+import computer_version.data.database as db
 from PyQt5.QtWidgets import QApplication
-from services.claude_service import ClaudeService
-from services.scan_service import ScanService
-from services.notification_service import NotificationService
-import services.review_scheduler as review_scheduler
-from ui.app import App
+from computer_version.services.claude_service import ClaudeService
+from computer_version.services.scan_service import ScanService
+from computer_version.services.notification_service import NotificationService
+import computer_version.services.review_scheduler as review_scheduler
+from computer_version.ui.app import App
 
 
 def main():

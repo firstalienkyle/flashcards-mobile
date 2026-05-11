@@ -7,8 +7,8 @@ sys.path.insert(0, _app_dir)
 # Set phone-sized preview window on desktop — must happen before any kivy import
 if not os.environ.get('ANDROID_ARGUMENT'):
     from kivy.config import Config
-    Config.set('graphics', 'width',  '393')   # Samsung Galaxy A34 aspect ratio
-    Config.set('graphics', 'height', '876')   # 1080x2408 scaled down
+    Config.set('graphics', 'width',  '280')
+    Config.set('graphics', 'height', '600')
     Config.set('graphics', 'resizable', '0')
 
 import data.database as db

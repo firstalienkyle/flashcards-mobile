@@ -1,7 +1,7 @@
 import json
 import pytest
 from unittest.mock import MagicMock, patch
-from services.claude_service import ClaudeService
+from computer_version.services.claude_service import ClaudeService
 
 @pytest.fixture
 def svc():

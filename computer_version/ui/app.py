@@ -28,21 +28,21 @@ class App(QMainWindow):
             old.deleteLater()
 
     def show_home(self) -> None:
-        from ui.home_screen import HomeScreen
+        from computer_version.ui.home_screen import HomeScreen
         self._switch(HomeScreen(self))
 
     def show_review(self) -> None:
-        from ui.review_screen import ReviewScreen
+        from computer_version.ui.review_screen import ReviewScreen
         self._switch(ReviewScreen(self))
 
     def show_create(self, deck_id=None) -> None:
-        from ui.create_screen import CreateScreen
+        from computer_version.ui.create_screen import CreateScreen
         self._switch(CreateScreen(self, deck_id=deck_id))
 
     def show_deck(self, deck_id: int) -> None:
-        from ui.deck_screen import DeckScreen
+        from computer_version.ui.deck_screen import DeckScreen
         self._switch(DeckScreen(self, deck_id=deck_id))
 
     def show_settings(self) -> None:
-        from ui.settings_screen import SettingsScreen
+        from computer_version.ui.settings_screen import SettingsScreen
         self._switch(SettingsScreen(self))

@@ -31,6 +31,7 @@ def init_db() -> None:
                 memory_level  REAL    NOT NULL DEFAULT 0.0,
                 last_reviewed TEXT,
                 review_count  INTEGER NOT NULL DEFAULT 0,
+                mastery_count INTEGER NOT NULL DEFAULT 0,
                 created_at    TEXT    NOT NULL
             );
             CREATE TABLE IF NOT EXISTS review_sessions (
@@ -57,6 +58,10 @@ def init_db() -> None:
         """)
         try:
             conn.execute("ALTER TABLE cards ADD COLUMN review_count INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE cards ADD COLUMN mastery_count INTEGER NOT NULL DEFAULT 0")
         except Exception:
             pass
 
@@ -98,6 +103,7 @@ def _row_to_card(r: sqlite3.Row) -> Card:
         memory_level=r["memory_level"],
         last_reviewed=datetime.fromisoformat(r["last_reviewed"]) if r["last_reviewed"] else None,
         review_count=r["review_count"],
+        mastery_count=r["mastery_count"],
         created_at=datetime.fromisoformat(r["created_at"]),
     )
 
@@ -139,9 +145,20 @@ def delete_card(card_id: int) -> None:
 
 def update_card_memory(card_id: int, memory_level: float, last_reviewed: datetime) -> None:
     with _conn() as conn:
+        # Increment mastery_count if reaching 100 (natural progression, not via buttons)
+        mastery_increment = "mastery_count + 1" if memory_level >= 100.0 else "mastery_count"
         conn.execute(
-            "UPDATE cards SET memory_level=?, last_reviewed=?, review_count=review_count+1 WHERE id=?",
+            f"UPDATE cards SET memory_level=?, last_reviewed=?, review_count=review_count+1, "
+            f"mastery_count = {mastery_increment} WHERE id=?",
             (memory_level, last_reviewed.isoformat(), card_id)
+        )
+
+def update_card_memory_from_button(card_id: int, memory_level: float) -> None:
+    """Update memory WITHOUT affecting mastery_count (used by ✓/✗ buttons)."""
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE cards SET memory_level=? WHERE id=?",
+            (memory_level, card_id)
         )
 
 def create_session() -> ReviewSession:
