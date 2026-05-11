@@ -88,10 +88,13 @@ class HomeScreen(Screen):
             self._current = None
             return
 
-        # Sort by memory level; pick randomly from the bottom 75% (weakest pool)
         sorted_btns = sorted(self._buttons, key=lambda b: b.memory_level)
-        pool_end = max(1, int(len(sorted_btns) * 0.75))
-        self._current = random.choice(sorted_btns[:pool_end])
+        min_lvl = sorted_btns[0].memory_level
+        lowest = [b for b in sorted_btns if b.memory_level <= min_lvl + 0.5]
+        others  = [b for b in sorted_btns if b.memory_level >  min_lvl + 0.5]
+        self._current = (random.choice(lowest)
+                         if (not others or random.random() < 0.75)
+                         else random.choice(others))
         self._refresh_display()
 
     def _refresh_display(self):

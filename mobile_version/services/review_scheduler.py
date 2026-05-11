@@ -16,17 +16,22 @@ def compute_effective_level(card: Card, decay_rate: float) -> float:
 def build_review_queue(cards: list[Card], decay_rate: float, queue_size: int = 25) -> list[Card]:
     if not cards:
         return []
-    scored = sorted(cards, key=lambda c: compute_effective_level(c, decay_rate))
-    # Bottom 75% of ALL cards is the weak pool; randomly sample from it (not sequential)
-    weak_end = max(1, int(len(scored) * 0.75))
-    weak_pool = scored[:weak_end]
-    strong_pool = scored[weak_end:]
-    # Fill 75% of queue slots from weak pool, rest from strong pool — both randomly sampled
-    n_weak = min(max(1, int(queue_size * 0.75)), len(weak_pool))
-    n_strong = min(queue_size - n_weak, len(strong_pool))
-    queue = random.sample(weak_pool, n_weak) + (
-        random.sample(strong_pool, n_strong) if n_strong > 0 else []
-    )
+    levels = {c.id: compute_effective_level(c, decay_rate) for c in cards}
+    available = sorted(cards, key=lambda c: levels[c.id])
+    queue: list[Card] = []
+
+    while available and len(queue) < queue_size:
+        min_lvl = levels[available[0].id]
+        # "lowest ones" = all cards tied at (or within 0.5 of) the current minimum
+        split = next((i for i, c in enumerate(available) if levels[c.id] > min_lvl + 0.5),
+                     len(available))
+        lowest = available[:split]
+        others  = available[split:]
+
+        pick = random.choice(lowest) if (not others or random.random() < 0.75) else random.choice(others)
+        queue.append(pick)
+        available.remove(pick)
+
     random.shuffle(queue)
     return queue
 
