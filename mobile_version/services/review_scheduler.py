@@ -17,17 +17,21 @@ def build_review_queue(cards: list[Card], decay_rate: float, queue_size: int = 2
     if not cards:
         return []
     levels = {c.id: compute_effective_level(c, decay_rate) for c in cards}
-    scored = sorted(cards, key=lambda c: levels[c.id])
+    available = sorted(cards, key=lambda c: levels[c.id])
+    queue: list[Card] = []
 
-    # "lowest ones" = cards tied at (or within 0.5 of) the minimum effective level
-    min_lvl = levels[scored[0].id]
-    split = next((i for i, c in enumerate(scored) if levels[c.id] > min_lvl + 0.5), len(scored))
-    lowest = scored[:split]
-    others  = scored[split:]
+    while available and len(queue) < queue_size:
+        min_lvl = levels[available[0].id]
+        # "lowest ones" = all cards tied at (or within 0.5 of) the current minimum
+        split = next((i for i, c in enumerate(available) if levels[c.id] > min_lvl + 0.5),
+                     len(available))
+        lowest = available[:split]
+        others  = available[split:]
 
-    n_low   = min(max(1, int(queue_size * 0.75)), len(lowest))
-    n_other = min(queue_size - n_low, len(others))
-    queue   = random.sample(lowest, n_low) + (random.sample(others, n_other) if n_other else [])
+        pick = random.choice(lowest) if (not others or random.random() < 0.75) else random.choice(others)
+        queue.append(pick)
+        available.remove(pick)
+
     random.shuffle(queue)
     return queue
 
